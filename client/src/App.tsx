@@ -1,30 +1,61 @@
-import { Switch, Route } from "wouter";
-import { queryClient } from "./lib/queryClient";
+import React from "react";
+import { Switch, Route, Redirect } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "@/components/ui/toaster";
+import { queryClient } from "./lib/queryClient";
 import NotFound from "@/pages/not-found";
+import Login from "@/pages/login";
+import Pin from "@/pages/pin";
+import Dashboard from "./pages/dashboard";
+import DailyFigures from "./pages/daily-figures";
+import CashingUp from "./pages/cashing-up";
+import Reports from "./pages/reports";
+import Documents from "./pages/documents";
+import Admin from "./pages/admin";
+import { AuthProvider, useAuth } from "@/state/auth";
+
+function GuardedRoute(props: {
+  path: string;
+  component: React.ComponentType<any>;
+  requirePin?: boolean;
+}) {
+  const { session } = useAuth();
+  const Comp = props.component;
+
+  if (!session.isAuthenticated) return <Redirect to="/login" />;
+  if (props.requirePin !== false && !session.staffPinVerified)
+    return <Redirect to="/pin" />;
+  return <Route path={props.path} component={Comp} />;
+}
 
 function Router() {
   return (
     <Switch>
-      {/* Add pages below */}
-      {/* <Route path="/" component={Home}/> */}
-      {/* Fallback to 404 */}
+      <Route path="/login" component={Login} />
+      <Route path="/pin" component={Pin} />
+
+      <GuardedRoute path="/" component={Dashboard} />
+      <GuardedRoute path="/daily-figures" component={DailyFigures} />
+      <GuardedRoute path="/cashing-up" component={CashingUp} />
+      <GuardedRoute path="/reports" component={Reports} />
+      <GuardedRoute path="/documents" component={Documents} />
+      <GuardedRoute path="/admin" component={Admin} />
+
       <Route component={NotFound} />
     </Switch>
   );
 }
 
-function App() {
+export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <Toaster />
-        <Router />
+        <AuthProvider>
+          <Toaster />
+          <Router />
+        </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );
 }
-
-export default App;
