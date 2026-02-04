@@ -17,6 +17,14 @@ export type StaffIdentity = {
   role: Role;
 };
 
+export type UserAccount = {
+  id: string;
+  email: string;
+  role: Role;
+  scope: Scope;
+  status: "active" | "locked";
+};
+
 export type SessionState = {
   isAuthenticated: boolean; // Email + Password + MFA passed
   staffPinVerified: boolean; // Staff PIN passed
@@ -51,30 +59,59 @@ type AuthContextValue = {
     | { ok: false; attemptsLeft: number; lockedOut: boolean }
   >;
   availableStaff: StaffIdentity[];
+  
+  // User Management
+  users: UserAccount[];
+  inviteUser: (email: string, role: Role, scopeType: "headoffice" | "pharmacy", pharmacyId?: string) => void;
+  deleteUser: (id: string) => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-function isInvited(email: string) {
-  const e = email.trim().toLowerCase();
-  return (
-    e === "helen.carter@athealth.co.uk" ||
-    e === "finance@athealth.co.uk" ||
-    e === "sarah.ahmed@athealth.co.uk" ||
-    e === "james.miller@athealth.co.uk" ||
-    e === "external.auditor@example.com"
-  );
-}
-
-function roleFor(email: string): { role: Role; scope: Scope } {
-  const e = email.trim().toLowerCase();
-  if (e === "helen.carter@athealth.co.uk") return { role: "Head Office Admin", scope: { type: "headoffice" } };
-  if (e === "finance@athealth.co.uk") return { role: "Finance", scope: { type: "headoffice" } };
-  if (e === "external.auditor@example.com") return { role: "Finance", scope: { type: "headoffice" } };
-  if (e === "sarah.ahmed@athealth.co.uk")
-    return { role: "Pharmacy Manager", scope: { type: "pharmacy", pharmacyId: "bowland", pharmacyName: "Bowland Pharmacy" } };
-  return { role: "Pharmacy Login", scope: { type: "pharmacy", pharmacyId: "denton", pharmacyName: "Denton Pharmacy" } };
-}
+const INITIAL_USERS: UserAccount[] = [
+  { 
+    id: "u1", 
+    email: "helen.carter@athealth.co.uk", 
+    role: "Head Office Admin", 
+    scope: { type: "headoffice" },
+    status: "active"
+  },
+  { 
+    id: "u2", 
+    email: "finance@athealth.co.uk", 
+    role: "Finance", 
+    scope: { type: "headoffice" },
+    status: "active"
+  },
+  { 
+    id: "u3", 
+    email: "sarah.ahmed@athealth.co.uk", 
+    role: "Pharmacy Manager", 
+    scope: { type: "pharmacy", pharmacyId: "bowland", pharmacyName: "Bowland Pharmacy" },
+    status: "active"
+  },
+  { 
+    id: "u4", 
+    email: "james.miller@athealth.co.uk", 
+    role: "Pharmacy Login", 
+    scope: { type: "pharmacy", pharmacyId: "denton", pharmacyName: "Denton Pharmacy" },
+    status: "active"
+  },
+  {
+    id: "u5",
+    email: "wilmslow.manager@athealth.co.uk",
+    role: "Pharmacy Manager",
+    scope: { type: "pharmacy", pharmacyId: "wilmslow", pharmacyName: "Wilmslow Pharmacy" },
+    status: "active"
+  },
+  {
+    id: "u6",
+    email: "external.auditor@example.com",
+    role: "Finance",
+    scope: { type: "headoffice" },
+    status: "active"
+  }
+];
 
 const STAFF_PIN = "1234";
 const MASTER_PIN = "145891";
@@ -91,6 +128,7 @@ const MOCK_STAFF_BY_SCOPE: Record<string, StaffIdentity[]> = {
   ],
   wilmslow: [
     { id: "w1", name: "Wilmslow Manager", role: "Pharmacy Manager" },
+    { id: "w2", name: "Duty Pharmacist", role: "Pharmacy Login" },
   ],
   headoffice: [
     { id: "h1", name: "Helen Carter", role: "Head Office Admin" },
@@ -99,7 +137,15 @@ const MOCK_STAFF_BY_SCOPE: Record<string, StaffIdentity[]> = {
   ]
 };
 
+const PHARMACY_NAMES: Record<string, string> = {
+  bowland: "Bowland Pharmacy",
+  denton: "Denton Pharmacy",
+  wilmslow: "Wilmslow Pharmacy"
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [users, setUsers] = useState<UserAccount[]>(INITIAL_USERS);
+  
   const [session, setSession] = useState<SessionState>({
     isAuthenticated: false,
     staffPinVerified: false,
@@ -124,13 +170,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSelectedStaffId(null);
   }, []);
 
+  const inviteUser = useCallback((email: string, role: Role, scopeType: "headoffice" | "pharmacy", pharmacyId?: string) => {
+    setUsers(prev => [
+      ...prev,
+      {
+        id: `u${Date.now()}`,
+        email,
+        role,
+        scope: scopeType === "pharmacy" && pharmacyId 
+          ? { type: "pharmacy", pharmacyId: pharmacyId as any, pharmacyName: PHARMACY_NAMES[pharmacyId] } 
+          : { type: "headoffice" },
+        status: "active"
+      }
+    ]);
+  }, []);
+
+  const deleteUser = useCallback((id: string) => {
+    setUsers(prev => prev.filter(u => u.id !== id));
+  }, []);
+
   const signIn = useCallback(async (input: SignInInput) => {
     await new Promise((r) => setTimeout(r, 600)); // Simulate net lag
-    if (!isInvited(input.email)) throw new Error("Not invited");
+    
+    const user = users.find(u => u.email.toLowerCase() === input.email.trim().toLowerCase());
+    
+    if (!user) throw new Error("Invalid credentials");
+    if (user.status === "locked") throw new Error("Account locked");
 
-    const { role, scope } = roleFor(input.email);
-
-    // Step 1: Email + Password check (simulated)
+    // Step 1: Email + Password check (simulated - accepts any password > 6 chars for mockup)
     // In real app, we'd verify password hash here.
     
     // Step 2: MFA (Email OTP) check
@@ -138,9 +205,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // If no OTP provided, ask for it
       setSession((s) => ({
         ...s,
-        userEmail: input.email,
-        role,
-        scope,
+        userEmail: user.email,
+        role: user.role,
+        scope: user.scope,
       }));
       return { next: "mfa" as const };
     }
@@ -150,15 +217,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       ...s,
       isAuthenticated: true, // Email+Pass+OTP done
       staffPinVerified: false,
-      userEmail: input.email,
-      role,
-      scope,
+      userEmail: user.email,
+      role: user.role,
+      scope: user.scope,
       pinAttemptsLeft: 3,
       pinLockoutUntil: null,
       lastLoginIp: "81.100.10.15", // Simulated Allowlisted IP
     }));
     return { next: "staff-picker" as const };
-  }, []);
+  }, [users]);
 
   const availableStaff = useMemo(() => {
     if (!session.scope) return [];
@@ -202,9 +269,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const staffUser = availableStaff.find(s => s.id === selectedStaffId);
     if (!staffUser) return { ok: false as const, attemptsLeft: 3, lockedOut: false };
-
-    // If master PIN used, override role to Super Admin for this session if needed, 
-    // or just log it. For now, we just allow entry.
     
     setSession((s) => ({
       ...s,
@@ -218,8 +282,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [session.pinAttemptsLeft, session.pinLockoutUntil, availableStaff, selectedStaffId]);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ session, signIn, signOut, verifyStaffPin, selectStaff, availableStaff }),
-    [session, signIn, signOut, verifyStaffPin, selectStaff, availableStaff],
+    () => ({ 
+      session, signIn, signOut, verifyStaffPin, selectStaff, availableStaff,
+      users, inviteUser, deleteUser 
+    }),
+    [session, signIn, signOut, verifyStaffPin, selectStaff, availableStaff, users, inviteUser, deleteUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
