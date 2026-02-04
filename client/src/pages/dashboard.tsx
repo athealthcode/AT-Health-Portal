@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { TrendingUp, TrendingDown, Clock, AlertTriangle } from "lucide-react";
+import { TrendingUp, TrendingDown, Clock, AlertTriangle, FileText } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -23,10 +23,9 @@ export default function Dashboard() {
 
   const kpis: KPI[] = useMemo(
     () => [
-      { id: "items", label: "Dispensed items", value: "1,248", sub: "Today", delta: "+4.2% vs last Wed", trend: "up" },
-      { id: "services", label: "Services total", value: "76", sub: "Today", delta: "-2 vs target", trend: "down" },
-      { id: "cash", label: "Cash to bank", value: "£1,240", sub: "Today", delta: "£0 variance", trend: "flat" },
-      { id: "late", label: "Late submissions", value: "0", sub: "This week", delta: "On track", trend: "flat" },
+      { id: "items", label: "Dispensed Items", value: "8,420", sub: "Month to Date", delta: "+2.1% vs target", trend: "up" },
+      { id: "services", label: "Services Total", value: "312", sub: "Month to Date", delta: "-5 vs target", trend: "down" },
+      { id: "cash", label: "Gross Takings", value: "£14,240", sub: "Month to Date", delta: "On track", trend: "up" },
     ],
     [],
   );
@@ -38,16 +37,13 @@ export default function Dashboard() {
           <div>
             <div className="font-serif text-2xl tracking-tight" data-testid="text-dashboard-title">Dashboard</div>
             <div className="text-sm text-muted-foreground" data-testid="text-dashboard-scope">
-              KPIs for {scopeLabel}. Comparisons are shown vs target and previous periods.
+              {scopeLabel} • {new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}
             </div>
           </div>
 
           <div className="flex flex-wrap gap-2">
             <Badge variant="secondary" className="pill" data-testid="badge-trading-day">
-              <Clock className="h-3.5 w-3.5 mr-1.5" /> Trading day ends +1h
-            </Badge>
-            <Badge variant="secondary" className="pill" data-testid="badge-alerts">
-              <AlertTriangle className="h-3.5 w-3.5 mr-1.5" /> Alerts enabled
+              <Clock className="h-3.5 w-3.5 mr-1.5" /> Month-to-Date View
             </Badge>
           </div>
         </div>
@@ -71,6 +67,23 @@ export default function Dashboard() {
               </Card>
             );
           })}
+          
+          {/* Nominations KPI */}
+          <Card className="rounded-2xl border bg-card/60 p-4">
+            <div className="flex items-start justify-between">
+               <div>
+                  <div className="text-sm text-muted-foreground">Nominations</div>
+                  <div className="mt-2 text-2xl font-semibold tracking-tight">4,120</div>
+                  <div className="mt-1 text-xs text-muted-foreground">Active Total</div>
+               </div>
+               <div className="h-10 w-10 rounded-2xl bg-emerald-500/10 text-emerald-600 grid place-items-center">
+                  <FileText className="h-5 w-5" />
+               </div>
+            </div>
+            <div className="mt-3 text-xs text-emerald-600 font-medium flex items-center gap-1">
+               <TrendingUp className="h-3 w-3" /> +12 this week
+            </div>
+          </Card>
         </div>
 
         <Separator />
@@ -84,28 +97,17 @@ export default function Dashboard() {
               <Button variant="outline" className="h-11" data-testid="button-go-documents" onClick={() => (window.location.href = "/documents")}>Documents</Button>
               <Button variant="outline" className="h-11" data-testid="button-go-reports" onClick={() => (window.location.href = "/reports")}>Reports</Button>
             </div>
-            <div className="mt-3 text-xs text-muted-foreground" data-testid="text-actions-note">
-              Submissions are due by end of trading day + 1 hour. Late flags and notifications apply.
-            </div>
           </Card>
 
           <Card className="rounded-2xl border bg-card/60 p-5" data-testid="card-compliance">
             <div className="text-sm font-semibold" data-testid="text-compliance-title">Compliance snapshot</div>
             <div className="mt-3 grid gap-2">
-              <div className="flex items-center justify-between rounded-xl border bg-background/40 px-3 py-3" data-testid="row-compliance-variance">
-                <div>
-                  <div className="text-sm font-medium" data-testid="text-compliance-variance-title">Variance days</div>
-                  <div className="text-xs text-muted-foreground" data-testid="text-compliance-variance-sub">Any variance (≠ 0) requires a reason.</div>
-                </div>
-                <Badge variant="secondary" className="pill" data-testid="badge-compliance-variance">2</Badge>
-              </div>
-
               <div className="flex items-center justify-between rounded-xl border bg-background/40 px-3 py-3" data-testid="row-compliance-late">
                 <div>
-                  <div className="text-sm font-medium" data-testid="text-compliance-late-title">Late submissions</div>
-                  <div className="text-xs text-muted-foreground" data-testid="text-compliance-late-sub">Auto-notify pharmacy + Head Office.</div>
+                  <div className="text-sm font-medium" data-testid="text-compliance-late-title">Late Submissions</div>
+                  <div className="text-xs text-muted-foreground" data-testid="text-compliance-late-sub">Last 7 days</div>
                 </div>
-                <Badge variant="secondary" className="pill" data-testid="badge-compliance-late">1</Badge>
+                <Badge variant="secondary" className="pill" data-testid="badge-compliance-late">0</Badge>
               </div>
             </div>
           </Card>

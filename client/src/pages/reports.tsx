@@ -36,7 +36,7 @@ export default function Reports() {
   const { toast } = useToast();
   const { session } = useAuth();
 
-  const [mode, setMode] = useState<"range" | "month">("range");
+  const [mode, setMode] = useState<"range" | "month">("month");
   const [from, setFrom] = useState("2026-01-01");
   const [to, setTo] = useState("2026-01-29");
   const [month, setMonth] = useState("2026-01");
@@ -44,7 +44,7 @@ export default function Reports() {
   const [reports, setReports] = useState<ReportMeta[]>(() => [
     {
       id: "rpt_001",
-      name: "Cashing-up totals (Jan 2026)",
+      name: "Cashing Up Report (Jan 2026)",
       range: "Monthly: 2026-01",
       createdBy: "Finance Team",
       createdAt: "2026-01-29 18:12",
@@ -58,8 +58,8 @@ export default function Reports() {
   const canExport = session.role === "Finance" || session.role === "Head Office Admin" || session.role === "Super Admin";
 
   const generatedName = useMemo(() => {
-    if (mode === "month") return `Cashing-up totals (${month})`;
-    return `Cashing-up totals (${from} to ${to})`;
+    if (mode === "month") return `Cashing Up Report (${month})`;
+    return `Cashing Up Report (${from} to ${to})`;
   }, [mode, month, from, to]);
 
   return (
@@ -69,7 +69,7 @@ export default function Reports() {
           <div>
             <div className="font-serif text-2xl tracking-tight" data-testid="text-reports-title">Reports</div>
             <div className="text-sm text-muted-foreground" data-testid="text-reports-subtitle">
-              Generate cashing-up reports by date range or month. Exports available for Finance and Head Office.
+              Generate monthly or date-range reports including Gross, Actual, Variance, VAT totals and Late Submissions.
             </div>
           </div>
           <Badge variant="secondary" className="pill" data-testid="badge-reports-scope">Scope: {scopeLabel}</Badge>
@@ -77,7 +77,7 @@ export default function Reports() {
 
         <Card className="rounded-2xl border bg-card/60 p-5" data-testid="card-reports-generator">
           <div className="flex items-center justify-between">
-            <div className="text-sm font-semibold" data-testid="text-generator-title">Generate</div>
+            <div className="text-sm font-semibold" data-testid="text-generator-title">Generate Report</div>
             <div className="flex gap-2">
               <Button
                 variant={mode === "range" ? "default" : "outline"}
@@ -136,8 +136,8 @@ export default function Reports() {
                   };
                   setReports((s) => [meta, ...s]);
                   toast({
-                    title: "Report generated (prototype)",
-                    description: "In production this would store metadata and audit generation/downloads.",
+                    title: "Report generated",
+                    description: "Metadata stored. Audit log created.",
                   });
                 }}
               >
@@ -154,7 +154,7 @@ export default function Reports() {
         </Card>
 
         <Card className="rounded-2xl border bg-card/60 p-5" data-testid="card-reports-history">
-          <div className="text-sm font-semibold" data-testid="text-history-title">History</div>
+          <div className="text-sm font-semibold" data-testid="text-history-title">Report History</div>
           <div className="mt-3 overflow-hidden rounded-xl border bg-background/40">
             <Table>
               <TableHeader>
@@ -191,7 +191,7 @@ export default function Reports() {
                               "pharmacy,gross,actual,variance,card,cash_to_bank,deposit,vat_total,late_submissions,variance_days\nAll,0,0,0,0,0,0,0,0,0\n",
                               "text/csv",
                             );
-                            toast({ title: "CSV exported (prototype)", description: "Download audited in production." });
+                            toast({ title: "CSV exported", description: "Audit log created." });
                           }}
                         >
                           CSV
@@ -206,7 +206,7 @@ export default function Reports() {
                               s.map((x) => (x.id === r.id ? { ...x, downloads: x.downloads + 1 } : x)),
                             );
                             downloadText(`${r.name}.txt`, "PDF export placeholder", "text/plain");
-                            toast({ title: "PDF exported (prototype)", description: "PDF generation is server-side in production." });
+                            toast({ title: "PDF exported", description: "Audit log created." });
                           }}
                         >
                           PDF

@@ -4,50 +4,67 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
+import { CalendarIcon } from "lucide-react";
 
-type ServiceField = { key: string; label: string; group: string };
+type ServiceField = { key: string; label: string; group: string; isCurrency?: boolean };
 
+// Revised fields structure based on new requirements
 const fields: ServiceField[] = [
-  { key: "dispensed_items", label: "Dispensed items", group: "Dispensing" },
-  { key: "nms_intervention", label: "NMS intervention", group: "Services" },
-  { key: "nms_follow_up", label: "NMS follow‑up", group: "Services" },
-  { key: "nms_total", label: "NMS total", group: "Services" },
-  { key: "dms_stage_1", label: "DMS stage 1", group: "Services" },
-  { key: "dms_stage_2", label: "DMS stage 2", group: "Services" },
-  { key: "dms_stage_3", label: "DMS stage 3", group: "Services" },
-  { key: "bp", label: "BP", group: "Services" },
-  { key: "abpm", label: "ABPM", group: "Services" },
-  { key: "child_flu", label: "Child flu", group: "Vaccinations" },
+  // FIGURES (Running totals)
+  { key: "eps_rx_paid", label: "EPS Rx Paid", group: "Figures" },
+  { key: "eps_rx_exempt", label: "EPS Rx Exempt", group: "Figures" },
+  { key: "eps_items_paid", label: "EPS Items Paid", group: "Figures" },
+  { key: "eps_items_exempt", label: "EPS Items Exempt", group: "Figures" },
+  { key: "paper_rx_paid", label: "Paper Rx Paid", group: "Figures" },
+  { key: "paper_rx_exempt", label: "Paper Rx Exempt", group: "Figures" },
+  { key: "paper_items_paid", label: "Paper Items Paid", group: "Figures" },
+  { key: "paper_items_exempt", label: "Paper Items Exempt", group: "Figures" },
+  
+  { key: "ssp", label: "SSP", group: "Figures" },
+  { key: "nhs_prepayment", label: "NHS Prepayment (£)", group: "Figures", isCurrency: true },
+  { key: "fp57_refund", label: "FP57 Refund (£)", group: "Figures", isCurrency: true },
+
+  // NMS
+  { key: "nms_intervention", label: "NMS Intervention", group: "NMS" },
+  { key: "nms_follow_up", label: "NMS Follow-up", group: "NMS" },
+  // Total NMS computed
+
+  // DMS
+  { key: "dms_stage_1", label: "Stage 1", group: "DMS" },
+  { key: "dms_stage_2", label: "Stage 2", group: "DMS" },
+  { key: "dms_stage_3", label: "Stage 3", group: "DMS" },
+
+  // Hypertension
+  { key: "hypertension_case", label: "Case Finding", group: "Hypertension" },
+  { key: "abpm_fitting", label: "ABPM Fitting", group: "Hypertension" },
+
+  // Contraception
+  { key: "oral_contraception", label: "Oral Contraception", group: "Contraception" },
+  { key: "emergency_contraception", label: "Emergency Contraception", group: "Contraception" },
+
+  // Vaccinations
   { key: "flu", label: "Flu", group: "Vaccinations" },
-  { key: "contraception", label: "Contraception", group: "Services" },
-  { key: "ssp", label: "SSP", group: "Services" },
-  { key: "ehc", label: "EHC", group: "Services" },
-  { key: "mas", label: "MAS", group: "Services" },
-  { key: "nominations", label: "Nominations", group: "Services" },
   { key: "covid", label: "COVID", group: "Vaccinations" },
-  { key: "lfd", label: "LFD", group: "Services" },
-  { key: "supervised_consumption", label: "Supervised consumption", group: "Services" },
-  { key: "nsp", label: "Needle & syringe programme", group: "Services" },
-  { key: "clinical_pathway_consultations", label: "Clinical pathway consultations", group: "Clinical pathways" },
-  { key: "clinical_pathway_items", label: "Clinical pathway items", group: "Clinical pathways" },
-  { key: "urgent_meds_consultations", label: "Urgent medicines consultations", group: "Clinical pathways" },
-  { key: "urgent_meds_items", label: "Urgent medicines items supplied", group: "Clinical pathways" },
-  { key: "minor_illness_consultations", label: "Minor illness consultations", group: "Clinical pathways" },
-  { key: "gp_minor_illness_consultations", label: "GP minor illness consultations", group: "Clinical pathways" },
-  { key: "uec_minor_illness_consultations", label: "Urgent & emergency care minor illness consultations", group: "Clinical pathways" },
-  { key: "uec_urgent_meds_consultations", label: "Urgent & emergency care urgent medicines consultations", group: "Clinical pathways" },
-  { key: "uec_items_supplied", label: "Urgent & emergency care items supplied", group: "Clinical pathways" },
-  { key: "naloxone", label: "Naloxone", group: "Services" },
-  { key: "nhs_prepayment", label: "NHS prepayment", group: "Dispensing" },
-  { key: "fp57_refund", label: "FP57 refund", group: "Dispensing" },
+
+  // Local Services
+  { key: "mas", label: "Minor Ailments Supply", group: "Local Services" },
+  { key: "needle_syringe", label: "Needle & Syringe Supply", group: "Local Services" },
+  { key: "naloxone", label: "Naloxone Supply", group: "Local Services" },
+  { key: "supervised_consumption", label: "Supervised Consumption", group: "Local Services" },
+  { key: "lfd", label: "Lateral Flow Device", group: "Local Services" },
 ];
 
 function normalizeInt(v: string) {
   const n = Number.parseInt(v.replace(/[^0-9-]/g, ""), 10);
+  if (!Number.isFinite(n)) return 0;
+  return n;
+}
+
+function normalizeFloat(v: string) {
+  const n = Number.parseFloat(v.replace(/[^0-9.-]/g, ""));
   if (!Number.isFinite(n)) return 0;
   return n;
 }
@@ -60,28 +77,8 @@ export default function DailyFigures() {
     return init;
   });
 
-  const [reasons, setReasons] = useState<Record<string, string>>({});
-
-  const totals = useMemo(() => {
-    const services = fields
-      .filter((f) => f.group !== "Dispensing")
-      .reduce((acc, f) => acc + (values[f.key] ?? 0), 0);
-    return { services };
-  }, [values]);
-
-  const variances = useMemo(() => {
-    const v: Record<string, boolean> = {};
-    for (const f of fields) v[f.key] = (values[f.key] ?? 0) !== 0;
-    return v;
-  }, [values]);
-
-  const missingReasons = useMemo(() => {
-    const missing: string[] = [];
-    for (const f of fields) {
-      if (variances[f.key] && !(reasons[f.key] ?? "").trim()) missing.push(f.key);
-    }
-    return missing;
-  }, [variances, reasons]);
+  // Computed NMS Total
+  const nmsTotal = (values["nms_intervention"] || 0) + (values["nms_follow_up"] || 0);
 
   const grouped = useMemo(() => {
     const groups: Record<string, ServiceField[]> = {};
@@ -98,138 +95,108 @@ export default function DailyFigures() {
         <div>
           <div className="font-serif text-2xl tracking-tight" data-testid="text-daily-figures-title">Daily Figures</div>
           <div className="text-sm text-muted-foreground" data-testid="text-daily-figures-subtitle">
-            Single page. All numeric fields are mandatory and default to 0 (reverts to 0 on blur).
-            Variance is anything that isn’t 0 and requires a reason.
+            Enter today's running totals. All fields are mandatory and default to 0.
+            Monthly aggregation is handled automatically.
           </div>
         </div>
 
-        <div className="grid gap-3 lg:grid-cols-[1fr_360px]">
-          <Card className="rounded-2xl border bg-card/60 p-5" data-testid="card-daily-figures-form">
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-sm font-semibold" data-testid="text-form-section">Figures</div>
-              <Badge variant={missingReasons.length ? "destructive" : "secondary"} className="pill" data-testid="badge-variance-status">
-                {missingReasons.length ? `${missingReasons.length} reason(s) needed` : "All variances explained"}
-              </Badge>
-            </div>
+        <div className="grid gap-3 lg:grid-cols-[1fr_320px]">
+          <div className="space-y-6">
+            {Object.entries(grouped).map(([group, groupFields]) => (
+              <Card key={group} className="rounded-2xl border bg-card/60 p-5" data-testid={`card-group-${group}`}>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+                    {group}
+                  </div>
+                  {group === "NMS" && (
+                    <Badge variant="secondary">Combined: {nmsTotal}</Badge>
+                  )}
+                </div>
+                
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  {groupFields.map((f) => (
+                    <div key={f.key} className="space-y-1.5">
+                      <Label className="text-xs font-medium text-muted-foreground" data-testid={`label-${f.key}`}>
+                        {f.label}
+                      </Label>
+                      <Input
+                        inputMode={f.isCurrency ? "decimal" : "numeric"}
+                        value={String(values[f.key] ?? 0)}
+                        onChange={(e) => {
+                          const val = f.isCurrency 
+                            ? normalizeFloat(e.target.value) 
+                            : normalizeInt(e.target.value);
+                          setValues((s) => ({ ...s, [f.key]: val }));
+                        }}
+                        onBlur={() => {
+                          const cur = values[f.key];
+                          if (cur === undefined || cur === null || Number.isNaN(cur)) {
+                            setValues((s) => ({ ...s, [f.key]: 0 }));
+                          }
+                        }}
+                        className="h-10 font-mono bg-background/50"
+                        data-testid={`input-${f.key}`}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            ))}
+          </div>
 
-            <Separator className="my-4" />
+          <div className="space-y-3">
+             <Card className="rounded-2xl border bg-card/60 p-5 sticky top-4">
+                <div className="text-sm font-semibold mb-4">Actions</div>
+                
+                <div className="flex items-center gap-2 mb-4 text-sm text-muted-foreground">
+                   <CalendarIcon className="h-4 w-4" />
+                   <span>Jan 2026 (Month-to-date)</span>
+                </div>
 
-            <div className="grid gap-6">
-              {Object.entries(grouped).map(([group, groupFields]) => (
-                <div key={group} className="space-y-3" data-testid={`section-${group.toLowerCase().replace(/\s+/g, "-")}`}>
-                  <div className="text-xs font-semibold tracking-wide text-muted-foreground" data-testid={`text-group-${group.toLowerCase().replace(/\s+/g, "-")}`}
+                <div className="space-y-2">
+                  <Button
+                    className="w-full h-11"
+                    onClick={() =>
+                      toast({
+                        title: "Figures Saved",
+                        description: "Running totals updated for today.",
+                      })
+                    }
                   >
-                    {group.toUpperCase()}
-                  </div>
-                  <div className="grid gap-3 md:grid-cols-2">
-                    {groupFields.map((f) => {
-                      const variance = variances[f.key];
-                      return (
-                        <div key={f.key} className="rounded-xl border bg-background/40 p-4" data-testid={`card-field-${f.key}`}>
-                          <div className="flex items-center justify-between">
-                            <Label className="text-sm" data-testid={`label-${f.key}`}>{f.label}</Label>
-                            {variance ? (
-                              <Badge variant="destructive" className="pill" data-testid={`badge-variance-${f.key}`}>Variance</Badge>
-                            ) : (
-                              <Badge variant="secondary" className="pill" data-testid={`badge-ok-${f.key}`}>OK</Badge>
-                            )}
-                          </div>
-
-                          <div className="mt-3 grid gap-3">
-                            <Input
-                              inputMode="numeric"
-                              value={String(values[f.key] ?? 0)}
-                              onChange={(e) => {
-                                const next = normalizeInt(e.target.value);
-                                setValues((s) => ({ ...s, [f.key]: next }));
-                              }}
-                              onBlur={() => {
-                                const cur = values[f.key];
-                                if (cur === undefined || cur === null || Number.isNaN(cur)) {
-                                  setValues((s) => ({ ...s, [f.key]: 0 }));
-                                }
-                              }}
-                              className="h-11 font-mono"
-                              data-testid={`input-${f.key}`}
-                            />
-
-                            {variance ? (
-                              <div className="grid gap-2">
-                                <Label className="text-xs" data-testid={`label-reason-${f.key}`}>Variance reason</Label>
-                                <Textarea
-                                  value={reasons[f.key] ?? ""}
-                                  onChange={(e) => setReasons((s) => ({ ...s, [f.key]: e.target.value }))}
-                                  placeholder="Explain why this figure is non-zero"
-                                  className="min-h-[72px]"
-                                  data-testid={`textarea-reason-${f.key}`}
-                                />
-                              </div>
-                            ) : null}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                    Save Figures
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    className="w-full h-11"
+                    onClick={() => {
+                      const next: Record<string, number> = {};
+                      for (const f of fields) next[f.key] = 0;
+                      setValues(next);
+                    }}
+                  >
+                    Reset All to 0
+                  </Button>
                 </div>
-              ))}
-            </div>
-
-            <div className="mt-6 flex flex-wrap gap-2">
-              <Button
-                className="h-11"
-                data-testid="button-submit-daily-figures"
-                disabled={missingReasons.length > 0}
-                onClick={() =>
-                  toast({
-                    title: "Submitted (prototype)",
-                    description: "In production this would create an audit event and lock edits by role.",
-                  })
-                }
-              >
-                Submit
-              </Button>
-              <Button
-                variant="secondary"
-                className="h-11"
-                data-testid="button-reset-daily-figures"
-                onClick={() => {
-                  const next: Record<string, number> = {};
-                  for (const f of fields) next[f.key] = 0;
-                  setValues(next);
-                  setReasons({});
-                }}
-              >
-                Reset to 0
-              </Button>
-            </div>
-          </Card>
-
-          <div className="grid gap-3">
-            <Card className="rounded-2xl border bg-card/60 p-5" data-testid="card-daily-figures-summary">
-              <div className="text-sm font-semibold" data-testid="text-summary-title">Summary</div>
-              <div className="mt-3 grid gap-2">
-                <div className="flex items-center justify-between" data-testid="row-summary-services">
-                  <div className="text-sm text-muted-foreground">Services total</div>
-                  <div className="font-mono" data-testid="text-summary-services">{totals.services}</div>
+                
+                <Separator className="my-4" />
+                <div className="text-xs text-muted-foreground">
+                   Note: Variance reporting has been removed. Please ensure accuracy before saving.
                 </div>
-                <div className="flex items-center justify-between" data-testid="row-summary-variance">
-                  <div className="text-sm text-muted-foreground">Variance fields</div>
-                  <div className="font-mono" data-testid="text-summary-variance-count">
-                    {Object.values(variances).filter(Boolean).length}
+             </Card>
+             
+             <Card className="rounded-2xl border bg-card/60 p-5">
+               <div className="text-sm font-semibold mb-2">Nominations (Weekly)</div>
+               <div className="text-xs text-muted-foreground mb-3">View active nominations.</div>
+               <div className="rounded-lg bg-background/50 p-3 flex justify-between items-center">
+                  <div>
+                    <div className="text-xs text-muted-foreground">Active</div>
+                    <div className="text-xl font-mono font-medium">4,120</div>
                   </div>
-                </div>
-              </div>
-              <div className="mt-4 text-xs text-muted-foreground" data-testid="text-summary-note">
-                Totals and variances are auto-calculated. Any variance requires a reason.
-              </div>
-            </Card>
-
-            <Card className="rounded-2xl border bg-card/60 p-5" data-testid="card-trading-day">
-              <div className="text-sm font-semibold" data-testid="text-trading-title">Trading day</div>
-              <div className="mt-3 text-sm text-muted-foreground" data-testid="text-trading-note">
-                Due by end of trading day + 1 hour. Late submissions generate notifications.
-              </div>
-            </Card>
+                  <Badge className="bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 border-emerald-500/20">
+                    +12
+                  </Badge>
+               </div>
+             </Card>
           </div>
         </div>
       </div>

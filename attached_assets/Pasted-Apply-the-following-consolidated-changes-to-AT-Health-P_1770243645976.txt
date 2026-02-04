@@ -1,0 +1,71 @@
+Apply the following consolidated changes to AT Health Portal without rewriting the entire app, keeping the UI clean and fast.
+
+AUTHENTICATION AND PIN FLOW (NO REGISTRATION):
+- Remove any user self-registration/sign-up flows; there must be no registration anywhere.
+- Only pre-created users (created by Head Office in Admin) can log in with email+password.
+- Always require MFA on every login using one-time codes sent to the registered email address (email OTP), including for external invited users.
+- After successful email+password+email-OTP, show a staff-picker screen for the selected pharmacy that lists named staff identities with roles. User clicks their name, then enters their PIN.
+- PIN rules: numeric only, 4–8 digits; created and reset only by Head Office; store failed attempts; lock after 3 failures for 10 minutes; generate Head Office alert/notification on lockout.
+- Master staff identity exists with PIN 145891 (6 digits) and role Super Admin/Master; master can log in from any IP; store the originating IP address in audit logs for every login.
+- Enforce pharmacy IP allowlisting for pharmacy logins server-side; pharmacy users cannot log in outside allowlisted pharmacy IPs. Master can bypass IP allowlist but still requires email OTP every time.
+- Once staff PIN is validated, do not ask again during the session. Provide explicit Logout action that logs out the staff session and returns to the staff-picker.
+
+DAILY FIGURES CHANGES (MONTHLY MODEL, REMOVE VARIANCE):
+- Remove variance concepts, fields, validation, and UI entirely from Daily Figures.
+- Convert the figures inputs to running totals split by channel and paid/exempt, eight fields total, all mandatory numeric default 0:
+  - EPS Rx Paid, EPS Rx Exempt
+  - EPS Items Paid, EPS Items Exempt
+  - Paper Rx Paid, Paper Rx Exempt
+  - Paper Items Paid, Paper Items Exempt
+- These are running totals; implement display and storage to support "today's running total" and "month-to-date running total" views for each metric. Ensure all modules use a monthly model (month-to-date aggregation).
+- Include SSP within the Figures section.
+- NHS Prepayment should be a currency field in GBP (amount sold), and FP57 Refund should be a currency field in GBP (amount refunded).
+
+SERVICES RESTRUCTURE AND RENAMING (GROUPED SUBHEADINGS, NO VARIANCE):
+- Add subheadings and grouped fields with computed totals where required:
+  - NMS: NMS Intervention, NMS Follow-up, and computed NMS Combined Total.
+  - DMS: Stage 1, Stage 2, Stage 3.
+  - Hypertension: Hypertension Case Finding and ABPM Fitting.
+  - Contraception: Oral Contraception and Emergency Contraception.
+  - Remove EHC entirely.
+  - Rename LFD to Lateral Flow Device.
+  - Local Services group: Minor Ailments Supply, Needle & Syringe Supply, Naloxone Supply, Supervised Consumption.
+  - Nominations should be tracked weekly (read-only for pharmacy staff).
+- Ensure all numeric fields remain mandatory with default 0 and revert to 0 on blur; no collapsible sections.
+
+NOMINATIONS WEEKLY TRACKING:
+- Add a weekly nominations record per pharmacy storing: currentActiveNominations and changeFromLastWeek, with a week-ending date.
+- Pharmacy ODS codes:
+  - Denton FQK26
+  - Bowland FDV31
+  - Wilmslow FE469
+- Only Head Office can create/update these weekly nominations records; pharmacy staff see them read-only.
+- UI formatting: if changeFromLastWeek is negative show red; if positive show green.
+
+CASHING UP CHANGES (CALCULATED GROSS/ACTUAL, DOUBLE-CHECK VARIANCE, MONTHLY MODEL):
+- Inputs staff must enter daily (trading days), all mandatory with default 0:
+  - To Be Banked
+  - Reading Card
+  - VAT Analysis buckets labelled exactly: Standard, Exempt, Zero, 5% VAT
+  - Pay Outs as flexible dynamic list (amount + detail)
+  - Cash Up Variance (entered by staff as double-check)
+- System calculations:
+  - Gross Taking = sum(Standard + Exempt + Zero + 5% VAT)
+  - Actual Taking = To Be Banked + Reading Card + total Pay Outs
+  - System Variance = Gross Taking - Actual Taking
+- Validation: block submission unless entered Cash Up Variance equals System Variance; show clear error asking to double-check entries.
+- Ensure cashing up is stored per trading day but dashboards and reports show month-to-date aggregations.
+
+REPORTING (CUSTOM AND MONTHLY CASHING UP REPORTS):
+- Add Reports page (Finance and Head Office only) to generate cashing up reports for a selected pharmacy or all pharmacies with a date range or monthly preset.
+- Report outputs include totals: Gross Taking, Actual Taking, Variance, To Be Banked, Reading Card, Pay Outs total, and VAT totals (Standard, Exempt, Zero, 5% VAT) plus counts of late submissions and days with non-zero variance.
+- Export report as CSV and PDF; store report metadata in DB; log report generation and downloads in audit logs.
+
+ADMIN UPDATES:
+- Ensure Admin can create users (invited only), set passwords, set roles, and manage staff identities and PINs (create/reset/lock/unlock), manage IP allowlists per pharmacy, manage opening hours/trading days, manage KPI targets, view audit logs and notifications.
+- Notify Head Office when an external email user is invited/created.
+
+AUDIT LOGGING:
+- Ensure every login, MFA challenge, staff selection, PIN success/failure, lockout, submissions, edits, exports, report generation, and master bypass events are recorded with timestamp, user/staff identity, pharmacy context, and IP address.
+
+After implementing, ensure the live preview works end-to-end with the new login flow (email+OTP+staff-picker+PIN).

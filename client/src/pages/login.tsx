@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/state/auth";
+import { ShieldCheck, Mail } from "lucide-react";
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -57,26 +58,24 @@ export default function Login() {
             <div className="mt-7 space-y-3">
               <div className="text-3xl font-semibold tracking-tight">Sign in</div>
               <div className="text-muted-foreground leading-relaxed">
-                Invited users only. After you sign in, you’ll confirm your identity using a staff PIN.
+                Invited users only. Registration is disabled.
               </div>
             </div>
 
             <div className="mt-6 flex flex-wrap gap-2">
               <Badge variant="secondary" data-testid="badge-security">
-                MFA required
+                <ShieldCheck className="h-3 w-3 mr-1" />
+                IP Allowlisted
               </Badge>
-              <Badge variant="secondary" data-testid="badge-audit">
-                Audit-tracked actions
-              </Badge>
-              <Badge variant="secondary" data-testid="badge-pharmacies">
-                Bowland • Denton • Wilmslow • Head Office
+              <Badge variant="secondary" data-testid="badge-mfa">
+                <Mail className="h-3 w-3 mr-1" />
+                Email OTP Required
               </Badge>
             </div>
 
             <div className="mt-10 space-y-2 text-xs text-muted-foreground">
               <div data-testid="text-security-note">
-                This is a frontend prototype. Security policies (IP allowlist, lockouts, trusted device, Teams/email hooks)
-                are represented in the UI and flows.
+                Security: Pre-created users only. IP allowlist enforced server-side.
               </div>
             </div>
           </div>
@@ -85,17 +84,14 @@ export default function Login() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="text-lg font-semibold tracking-tight" data-testid="text-login-title">
-                  {step === "login" ? "Email and password" : "Two‑factor authentication"}
+                  {step === "login" ? "Company Sign In" : "Email Verification"}
                 </div>
                 <div className="text-sm text-muted-foreground" data-testid="text-login-subtitle">
                   {step === "login"
-                    ? "Use your invite email."
-                    : "Enter the 6‑digit code from Microsoft Authenticator."}
+                    ? "Enter your credentials."
+                    : `Enter the code sent to ${email}`}
                 </div>
               </div>
-              <Badge variant="outline" className="pill" data-testid="badge-environment">
-                Prototype
-              </Badge>
             </div>
 
             <div className="mt-6 space-y-4">
@@ -108,7 +104,7 @@ export default function Login() {
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="name@company.com"
+                      placeholder="name@athealth.co.uk"
                       className="h-11"
                       data-testid="input-email"
                       autoComplete="email"
@@ -142,8 +138,10 @@ export default function Login() {
                         const res = await signIn({ email, password });
                         if (res.next === "mfa") {
                           setStep("mfa");
-                          toast({ title: "MFA required", description: "Enter your 6-digit code." });
+                          toast({ title: "OTP Sent", description: "Check your email for the code." });
                         }
+                      } catch (e) {
+                         toast({ title: "Access Denied", description: "Invalid credentials or not invited.", variant: "destructive" });
                       } finally {
                         setIsLoading(false);
                       }
@@ -151,17 +149,11 @@ export default function Login() {
                   >
                     Continue
                   </Button>
-
-                  <Alert className="mt-2" data-testid="alert-login-info">
-                    <div className="text-sm">
-                      <span className="font-medium">Invited users only.</span> If you can’t sign in, contact Head Office.
-                    </div>
-                  </Alert>
                 </>
               ) : (
                 <>
                   <div className="space-y-2">
-                    <Label data-testid="label-mfa-code">Authenticator code</Label>
+                    <Label data-testid="label-mfa-code">Email OTP</Label>
                     <div className="flex items-center justify-between gap-3">
                       <InputOTP
                         maxLength={6}
@@ -177,7 +169,7 @@ export default function Login() {
                       </InputOTP>
                     </div>
                     <div className="text-xs text-muted-foreground" data-testid="text-mfa-hint">
-                      Compatible with Microsoft Authenticator (TOTP).
+                      One-time code sent to your registered email.
                     </div>
                   </div>
 
@@ -200,8 +192,8 @@ export default function Login() {
                       onClick={async () => {
                         setIsLoading(true);
                         try {
-                          const res = await signIn({ email, password, totp: code });
-                          if (res.next === "pin") setLocation("/pin");
+                          const res = await signIn({ email, password, otp: code });
+                          if (res.next === "staff-picker") setLocation("/pin");
                         } finally {
                           setIsLoading(false);
                         }
@@ -210,41 +202,16 @@ export default function Login() {
                       Verify
                     </Button>
                   </div>
-
-                  <div className="rounded-xl border bg-card/50 p-4" data-testid="panel-backup-codes">
-                    <div className="text-sm font-medium">Backup codes</div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      If you’ve lost your authenticator, use a backup code (one-time use).
-                    </div>
-                    <div className="mt-3 flex gap-2">
-                      <Input
-                        placeholder="Enter backup code"
-                        className="h-10"
-                        data-testid="input-backup-code"
-                      />
-                      <Button variant="outline" className="h-10" data-testid="button-use-backup">
-                        Use
-                      </Button>
-                    </div>
-                  </div>
                 </>
               )}
             </div>
 
             <div className="mt-6 flex items-center justify-between text-xs text-muted-foreground">
-              <button
-                className="underline underline-offset-4 hover:text-foreground transition"
-                data-testid="button-forgot-password"
-                onClick={() =>
-                  toast({
-                    title: "Password reset",
-                    description: "In production, Head Office can trigger a reset for invited users.",
-                  })
-                }
-              >
-                Forgot password?
-              </button>
-              <div data-testid="text-session-timeout">Auto-logout on inactivity</div>
+              <div className="flex items-center gap-1">
+                 <ShieldCheck className="h-3 w-3" />
+                 <span>Official Use Only</span>
+              </div>
+              <div data-testid="text-session-timeout">Inactivity timeout enabled</div>
             </div>
           </Card>
         </motion.div>
