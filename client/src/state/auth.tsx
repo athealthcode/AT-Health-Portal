@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
+import React, { createContext, useCallback, useContext, useMemo, useState, useEffect } from "react";
 
 export type Role =
   | "Pharmacy Login"
@@ -25,6 +25,18 @@ export type UserAccount = {
   status: "active" | "locked";
 };
 
+export type TrustedBrowser = {
+  id: string;
+  userId: string;
+  tokenHash: string; // simulating hash storage
+  ipAddress: string;
+  userAgent: string;
+  createdAt: number;
+  expiresAt: number;
+  lastUsedAt: number;
+  revokedAt: number | null;
+};
+
 export type SessionState = {
   isAuthenticated: boolean; // Email + Password + MFA passed
   staffPinVerified: boolean; // Staff PIN passed
@@ -38,6 +50,7 @@ export type SessionState = {
   pinLockoutUntil: number | null;
   
   // Audit simulation
+  currentIp: string;
   lastLoginIp?: string;
 };
 
@@ -45,11 +58,17 @@ type SignInInput = {
   email: string;
   password: string;
   otp?: string;
+  trustDevice?: boolean;
+};
+
+type SignInResult = {
+  next: "mfa" | "staff-picker";
+  message?: string;
 };
 
 type AuthContextValue = {
   session: SessionState;
-  signIn: (input: SignInInput) => Promise<{ next: "mfa" | "staff-picker" }>; 
+  signIn: (input: SignInInput) => Promise<SignInResult>; 
   signOut: () => void;
   selectStaff: (staffId: string) => void;
   verifyStaffPin: (
@@ -64,6 +83,11 @@ type AuthContextValue = {
   users: UserAccount[];
   inviteUser: (email: string, role: Role, scopeType: "headoffice" | "pharmacy", pharmacyId?: string) => void;
   deleteUser: (id: string) => void;
+  
+  // Trusted Browser Management
+  trustedBrowsers: TrustedBrowser[];
+  revokeTrustedBrowser: (id: string) => void;
+  setSimulatedIp: (ip: string) => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -109,6 +133,7 @@ const INITIAL_USERS: UserAccount[] = [
 
 const STAFF_PIN = "1234";
 const MASTER_PIN = "145891";
+const DEFAULT_IP = "81.100.10.15";
 
 const MOCK_STAFF_BY_SCOPE: Record<string, StaffIdentity[]> = {
   bowland: [
@@ -137,6 +162,8 @@ const PHARMACY_NAMES: Record<string, string> = {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [users, setUsers] = useState<UserAccount[]>(INITIAL_USERS);
+  const [trustedBrowsers, setTrustedBrowsers] = useState<TrustedBrowser[]>([]);
+  const [currentIp, setCurrentIp] = useState(DEFAULT_IP);
   
   const [session, setSession] = useState<SessionState>({
     isAuthenticated: false,
@@ -144,9 +171,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     scope: { type: "pharmacy", pharmacyId: "bowland", pharmacyName: "Bowland Pharmacy" },
     pinAttemptsLeft: 3,
     pinLockoutUntil: null,
+    currentIp: DEFAULT_IP,
   });
 
   const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
+
+  // Sync currentIp to session
+  useEffect(() => {
+    setSession(s => ({ ...s, currentIp }));
+  }, [currentIp]);
 
   const signOut = useCallback(() => {
     setSession({
@@ -158,9 +191,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       scope: { type: "pharmacy", pharmacyId: "bowland", pharmacyName: "Bowland Pharmacy" },
       pinAttemptsLeft: 3,
       pinLockoutUntil: null,
+      currentIp,
     });
     setSelectedStaffId(null);
-  }, []);
+  }, [currentIp]);
 
   const inviteUser = useCallback((email: string, role: Role, scopeType: "headoffice" | "pharmacy", pharmacyId?: string) => {
     setUsers(prev => [
@@ -181,6 +215,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUsers(prev => prev.filter(u => u.id !== id));
   }, []);
 
+  const revokeTrustedBrowser = useCallback((id: string) => {
+    setTrustedBrowsers(prev => prev.map(tb => 
+      tb.id === id ? { ...tb, revokedAt: Date.now() } : tb
+    ));
+  }, []);
+
   const signIn = useCallback(async (input: SignInInput) => {
     await new Promise((r) => setTimeout(r, 600)); // Simulate net lag
     
@@ -189,35 +229,93 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!user) throw new Error("Invalid credentials");
     if (user.status === "locked") throw new Error("Account locked");
 
-    // Step 1: Email + Password check (simulated - accepts any password > 6 chars for mockup)
-    // In real app, we'd verify password hash here.
+    // Check Trusted Browser Cookie
+    const storedToken = localStorage.getItem("trusted_browser_token");
+    let trustVerified = false;
+    let trustMessage = undefined;
+
+    if (!input.otp && storedToken) {
+      const tb = trustedBrowsers.find(t => t.tokenHash === storedToken && t.userId === user.id);
+      
+      if (tb) {
+        if (tb.revokedAt) {
+          // Revoked
+        } else if (Date.now() > tb.expiresAt) {
+          // Expired
+        } else if (tb.ipAddress !== currentIp) {
+           trustMessage = "OTP required because network changed";
+        } else {
+           // Trusted!
+           trustVerified = true;
+           // Rotate token (simulated by updating lastUsed)
+           // In real app we'd issue new token here
+           setTrustedBrowsers(prev => prev.map(t => 
+             t.id === tb.id ? { ...t, lastUsedAt: Date.now() } : t
+           ));
+        }
+      }
+    }
+
+    // If trusted, skip OTP
+    if (trustVerified) {
+       setSession((s) => ({
+        ...s,
+        isAuthenticated: true,
+        staffPinVerified: false,
+        userEmail: user.email,
+        role: user.role,
+        scope: user.scope,
+        pinAttemptsLeft: 3,
+        pinLockoutUntil: null,
+        lastLoginIp: currentIp,
+      }));
+      return { next: "staff-picker" as const };
+    }
     
     // Step 2: MFA (Email OTP) check
     if (!input.otp) {
-      // If no OTP provided, ask for it
       setSession((s) => ({
         ...s,
         userEmail: user.email,
         role: user.role,
         scope: user.scope,
       }));
-      return { next: "mfa" as const };
+      return { next: "mfa" as const, message: trustMessage };
     }
 
-    // If OTP provided (simulated check)
+    // OTP Provided & Valid (simulated)
+    // Handle "Trust this browser" checkbox
+    if (input.trustDevice) {
+      const newToken = `tb_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      localStorage.setItem("trusted_browser_token", newToken);
+      
+      const newTb: TrustedBrowser = {
+        id: `tb_${Date.now()}`,
+        userId: user.id,
+        tokenHash: newToken, // Storing raw token as "hash" for mockup simplicity
+        ipAddress: currentIp,
+        userAgent: navigator.userAgent,
+        createdAt: Date.now(),
+        expiresAt: Date.now() + (7 * 24 * 60 * 60 * 1000), // 7 days
+        lastUsedAt: Date.now(),
+        revokedAt: null
+      };
+      setTrustedBrowsers(prev => [...prev, newTb]);
+    }
+
     setSession((s) => ({
       ...s,
-      isAuthenticated: true, // Email+Pass+OTP done
+      isAuthenticated: true,
       staffPinVerified: false,
       userEmail: user.email,
       role: user.role,
       scope: user.scope,
       pinAttemptsLeft: 3,
       pinLockoutUntil: null,
-      lastLoginIp: "81.100.10.15", // Simulated Allowlisted IP
+      lastLoginIp: currentIp,
     }));
     return { next: "staff-picker" as const };
-  }, [users]);
+  }, [users, trustedBrowsers, currentIp]);
 
   const availableStaff = useMemo(() => {
     if (!session.scope) return [];
@@ -242,13 +340,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { ok: false as const, attemptsLeft: session.pinAttemptsLeft, lockedOut: true };
     }
 
+    // Master PIN bypasses all checks except if trusted cookie + IP match required?
+    // Requirement 6: "Master still requires OTP unless trusted cookie+IP match within 7 days."
+    // This logic is handled at Login (MFA) stage. 
+    // This function `verifyStaffPin` is for the STAFF PIN (User identification), not the Account Login.
+    // So normal PIN logic applies here.
+    
     const isMaster = pin === MASTER_PIN;
     const isCorrect = pin === STAFF_PIN || isMaster;
 
     if (!isCorrect) {
       const nextAttempts = Math.max(0, session.pinAttemptsLeft - 1);
       const lockedOut = nextAttempts === 0;
-      const lockoutUntil = lockedOut ? now + 10 * 60 * 1000 : null; // 10 min lockout
+      const lockoutUntil = lockedOut ? now + 10 * 60 * 1000 : null;
 
       setSession((s) => ({
         ...s,
@@ -276,9 +380,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<AuthContextValue>(
     () => ({ 
       session, signIn, signOut, verifyStaffPin, selectStaff, availableStaff,
-      users, inviteUser, deleteUser 
+      users, inviteUser, deleteUser,
+      trustedBrowsers, revokeTrustedBrowser, setSimulatedIp: setCurrentIp
     }),
-    [session, signIn, signOut, verifyStaffPin, selectStaff, availableStaff, users, inviteUser, deleteUser],
+    [session, signIn, signOut, verifyStaffPin, selectStaff, availableStaff, users, inviteUser, deleteUser, trustedBrowsers, currentIp],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

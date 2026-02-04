@@ -8,10 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth, Role } from "@/state/auth";
+import { useAuth, Role, TrustedBrowser } from "@/state/auth";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Trash2, AlertTriangle } from "lucide-react";
+import { Trash2, AlertTriangle, Shield, Clock, Monitor } from "lucide-react";
 
 type Pharmacy = {
   id: string;
@@ -22,7 +22,7 @@ type Pharmacy = {
 
 export default function Admin() {
   const { toast } = useToast();
-  const { users, inviteUser, deleteUser, session } = useAuth();
+  const { users, inviteUser, deleteUser, session, trustedBrowsers, revokeTrustedBrowser } = useAuth();
   const [inviteOpen, setInviteOpen] = useState(false);
 
   // Invite Form State
@@ -30,6 +30,9 @@ export default function Admin() {
   const [newRole, setNewRole] = useState<Role>("Pharmacy Login");
   const [newScopeType, setNewScopeType] = useState<"headoffice" | "pharmacy">("pharmacy");
   const [newPharmacyId, setNewPharmacyId] = useState("bowland");
+
+  // Trusted Browser Dialog
+  const [viewingUserBrowsers, setViewingUserBrowsers] = useState<string | null>(null);
 
   const [pharmacies] = useState<Pharmacy[]>([
     { id: "bowland", name: "Bowland Pharmacy", openingHours: "Mon–Fri 09:00–18:00; Sat 09:00–13:00", ipAllowlist: ["81.100.10.0/24"] },
@@ -46,6 +49,11 @@ export default function Admin() {
   };
 
   const canManageUsers = session.role === "Head Office Admin" || session.role === "Super Admin";
+
+  const viewingUser = users.find(u => u.id === viewingUserBrowsers);
+  const userTrustedBrowsers = viewingUserBrowsers 
+    ? trustedBrowsers.filter(tb => tb.userId === viewingUserBrowsers && !tb.revokedAt && Date.now() < tb.expiresAt)
+    : [];
 
   return (
     <AppShell>
@@ -169,15 +177,27 @@ export default function Admin() {
                         {u.scope.type === "pharmacy" ? u.scope.pharmacyName : "Head Office"}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                          disabled={!canManageUsers}
-                          onClick={() => deleteUser(u.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <div className="flex justify-end gap-1">
+                          {/* Trusted Browsers View */}
+                          <Button 
+                             size="sm" 
+                             variant="ghost" 
+                             onClick={() => setViewingUserBrowsers(u.id)}
+                             disabled={!canManageUsers}
+                          >
+                             <Shield className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            disabled={!canManageUsers}
+                            onClick={() => deleteUser(u.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -188,6 +208,51 @@ export default function Admin() {
                <div className="mt-2 text-xs text-muted-foreground">Only Admins can manage users.</div>
             )}
           </Card>
+
+          {/* Trusted Devices Dialog */}
+          <Dialog open={!!viewingUserBrowsers} onOpenChange={(o) => !o && setViewingUserBrowsers(null)}>
+            <DialogContent>
+               <DialogHeader>
+                  <DialogTitle>Trusted Devices: {viewingUser?.email}</DialogTitle>
+               </DialogHeader>
+               <div className="py-4">
+                  {userTrustedBrowsers.length === 0 ? (
+                     <div className="text-sm text-muted-foreground">No active trusted devices.</div>
+                  ) : (
+                     <div className="grid gap-3">
+                        {userTrustedBrowsers.map(tb => (
+                           <div key={tb.id} className="flex items-start justify-between rounded-lg border p-3 text-sm">
+                              <div>
+                                 <div className="flex items-center gap-2 font-medium">
+                                    <Monitor className="h-4 w-4" />
+                                    {tb.ipAddress}
+                                 </div>
+                                 <div className="text-xs text-muted-foreground mt-1">
+                                    Last used: {new Date(tb.lastUsedAt).toLocaleDateString()}
+                                 </div>
+                                 <div className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                                    <Clock className="h-3 w-3" />
+                                    Expires: {new Date(tb.expiresAt).toLocaleDateString()}
+                                 </div>
+                              </div>
+                              <Button 
+                                 size="sm" 
+                                 variant="outline" 
+                                 className="text-destructive hover:bg-destructive/10"
+                                 onClick={() => {
+                                    revokeTrustedBrowser(tb.id);
+                                    toast({ title: "Device Revoked", description: "User will be prompted for OTP on next login." });
+                                 }}
+                              >
+                                 Revoke
+                              </Button>
+                           </div>
+                        ))}
+                     </div>
+                  )}
+               </div>
+            </DialogContent>
+          </Dialog>
 
           {/* PHARMACIES CARD */}
           <Card className="rounded-2xl border bg-card/60 p-5" data-testid="card-pharmacies">

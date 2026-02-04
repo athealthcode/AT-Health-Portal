@@ -7,21 +7,27 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Alert } from "@/components/ui/alert";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/state/auth";
-import { ShieldCheck, Mail } from "lucide-react";
+import { ShieldCheck, Mail, Network } from "lucide-react";
 
 export default function Login() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const { signIn, session } = useAuth();
+  const { signIn, session, setSimulatedIp } = useAuth();
 
   const [step, setStep] = useState<"login" | "mfa">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
+  const [trustDevice, setTrustDevice] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [networkMessage, setNetworkMessage] = useState<string | null>(null);
+
+  // Dev: State for IP simulation
+  const [devIp, setDevIp] = useState("81.100.10.15");
+  const [showDev, setShowDev] = useState(false);
 
   useEffect(() => {
     if (session.isAuthenticated) setLocation("/pin");
@@ -77,6 +83,24 @@ export default function Login() {
               <div data-testid="text-security-note">
                 Security: Pre-created users only. IP allowlist enforced server-side.
               </div>
+              <div className="pt-4 cursor-pointer hover:text-primary" onClick={() => setShowDev(!showDev)}>
+                 Build v0.4.2 {showDev ? "(Dev Mode Active)" : ""}
+              </div>
+              {showDev && (
+                 <div className="p-3 border rounded bg-background/50 backdrop-blur-sm space-y-2 max-w-xs">
+                    <div className="font-mono font-bold">Simulate Network</div>
+                    <div className="flex gap-2">
+                       <Input value={devIp} onChange={e => setDevIp(e.target.value)} className="h-8 font-mono text-xs" />
+                       <Button size="sm" variant="outline" className="h-8" onClick={() => {
+                          setSimulatedIp(devIp);
+                          toast({ title: "IP Changed", description: `Simulated IP: ${devIp}` });
+                       }}>Set IP</Button>
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">
+                       Current: {session.currentIp}
+                    </div>
+                 </div>
+              )}
             </div>
           </div>
 
@@ -93,6 +117,13 @@ export default function Login() {
                 </div>
               </div>
             </div>
+
+            {networkMessage && (
+               <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md flex items-center gap-2 text-sm text-amber-900 animate-in fade-in slide-in-from-top-1">
+                  <Network className="h-4 w-4" />
+                  {networkMessage}
+               </div>
+            )}
 
             <div className="mt-6 space-y-4">
               {step === "login" ? (
@@ -134,11 +165,13 @@ export default function Login() {
                     disabled={!email.trim() || password.length < 6 || isLoading}
                     onClick={async () => {
                       setIsLoading(true);
+                      setNetworkMessage(null);
                       try {
                         const res = await signIn({ email, password });
                         if (res.next === "mfa") {
                           setStep("mfa");
                           toast({ title: "OTP Sent", description: "Check your email for the code." });
+                          if (res.message) setNetworkMessage(res.message);
                         }
                       } catch (e) {
                          toast({ title: "Access Denied", description: "Invalid credentials or not invited.", variant: "destructive" });
@@ -173,6 +206,25 @@ export default function Login() {
                     </div>
                   </div>
 
+                  <div className="flex items-start space-x-2 py-2">
+                    <Checkbox 
+                      id="trust" 
+                      checked={trustDevice} 
+                      onCheckedChange={(c) => setTrustDevice(!!c)} 
+                    />
+                    <div className="grid gap-1.5 leading-none">
+                      <Label
+                        htmlFor="trust"
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        Trust this browser for 7 days
+                      </Label>
+                      <p className="text-[0.8rem] text-muted-foreground">
+                        Only works on this device and network.
+                      </p>
+                    </div>
+                  </div>
+
                   <div className="grid gap-3 md:grid-cols-2">
                     <Button
                       variant="secondary"
@@ -181,6 +233,7 @@ export default function Login() {
                       onClick={() => {
                         setStep("login");
                         setCode("");
+                        setNetworkMessage(null);
                       }}
                     >
                       Back
@@ -192,7 +245,7 @@ export default function Login() {
                       onClick={async () => {
                         setIsLoading(true);
                         try {
-                          const res = await signIn({ email, password, otp: code });
+                          const res = await signIn({ email, password, otp: code, trustDevice });
                           if (res.next === "staff-picker") setLocation("/pin");
                         } finally {
                           setIsLoading(false);
