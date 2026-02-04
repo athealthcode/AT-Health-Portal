@@ -68,47 +68,41 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+// SEEDED USERS
 const INITIAL_USERS: UserAccount[] = [
   { 
     id: "u1", 
-    email: "helen.carter@athealth.co.uk", 
-    role: "Head Office Admin", 
+    email: "admin@at-health.co.uk", 
+    role: "Super Admin", 
     scope: { type: "headoffice" },
     status: "active"
   },
   { 
     id: "u2", 
-    email: "finance@athealth.co.uk", 
+    email: "finance@at-health.co.uk", 
     role: "Finance", 
     scope: { type: "headoffice" },
     status: "active"
   },
   { 
     id: "u3", 
-    email: "sarah.ahmed@athealth.co.uk", 
-    role: "Pharmacy Manager", 
+    email: "info@bowlandpharmacy.co.uk", 
+    role: "Pharmacy Login", 
     scope: { type: "pharmacy", pharmacyId: "bowland", pharmacyName: "Bowland Pharmacy" },
     status: "active"
   },
   { 
     id: "u4", 
-    email: "james.miller@athealth.co.uk", 
+    email: "info@dentonpharmacy.co.uk", 
     role: "Pharmacy Login", 
     scope: { type: "pharmacy", pharmacyId: "denton", pharmacyName: "Denton Pharmacy" },
     status: "active"
   },
   {
     id: "u5",
-    email: "wilmslow.manager@athealth.co.uk",
-    role: "Pharmacy Manager",
+    email: "info@wilmslowpharmacy.co.uk",
+    role: "Pharmacy Login", 
     scope: { type: "pharmacy", pharmacyId: "wilmslow", pharmacyName: "Wilmslow Pharmacy" },
-    status: "active"
-  },
-  {
-    id: "u6",
-    email: "external.auditor@example.com",
-    role: "Finance",
-    scope: { type: "headoffice" },
     status: "active"
   }
 ];
@@ -118,22 +112,20 @@ const MASTER_PIN = "145891";
 
 const MOCK_STAFF_BY_SCOPE: Record<string, StaffIdentity[]> = {
   bowland: [
-    { id: "s1", name: "Sarah Ahmed", role: "Pharmacy Manager" },
-    { id: "s2", name: "Duty Pharmacist", role: "Pharmacy Login" },
-    { id: "s3", name: "Dispenser 1", role: "Pharmacy Login" },
+    { id: "b1", name: "John Smith", role: "Pharmacy Manager" },
+    { id: "b2", name: "Barbara Thompson", role: "Pharmacy Login" },
   ],
   denton: [
-    { id: "d1", name: "James Miller", role: "Pharmacy Login" },
-    { id: "d2", name: "Denton Manager", role: "Pharmacy Manager" },
+    { id: "d1", name: "Dan Denton", role: "Pharmacy Manager" },
+    { id: "d2", name: "Alice Denton", role: "Pharmacy Login" },
   ],
   wilmslow: [
-    { id: "w1", name: "Wilmslow Manager", role: "Pharmacy Manager" },
-    { id: "w2", name: "Duty Pharmacist", role: "Pharmacy Login" },
+    { id: "w1", name: "Will Wilmslow", role: "Pharmacy Manager" },
+    { id: "w2", name: "Wendy Wilmslow", role: "Pharmacy Login" },
   ],
   headoffice: [
-    { id: "h1", name: "Helen Carter", role: "Head Office Admin" },
-    { id: "h2", name: "Finance Team", role: "Finance" },
-    { id: "h3", name: "Super Admin", role: "Super Admin" },
+    { id: "h1", name: "Master User", role: "Super Admin" },
+    { id: "h2", name: "Finance User", role: "Finance" },
   ]
 };
 

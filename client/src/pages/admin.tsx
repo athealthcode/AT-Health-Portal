@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth, Role } from "@/state/auth";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Trash2 } from "lucide-react";
+import { Trash2, AlertTriangle } from "lucide-react";
 
 type Pharmacy = {
   id: string;
@@ -55,6 +55,34 @@ export default function Admin() {
           <div className="text-sm text-muted-foreground" data-testid="text-admin-subtitle">
             Manage pharmacies, users, roles, and security settings.
           </div>
+        </div>
+        
+        {/* Test Data Awareness Banner - Only for Admins */}
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
+           <div className="flex items-center gap-2 mb-2 font-semibold">
+              <AlertTriangle className="h-4 w-4" />
+              Test Data (Seed Users)
+           </div>
+           <div className="text-xs grid md:grid-cols-2 lg:grid-cols-3 gap-2">
+              <div>
+                 <strong>Head Office:</strong> admin@at-health.co.uk
+              </div>
+              <div>
+                 <strong>Finance:</strong> finance@at-health.co.uk
+              </div>
+              <div>
+                 <strong>Bowland:</strong> info@bowlandpharmacy.co.uk
+              </div>
+              <div>
+                 <strong>Denton:</strong> info@dentonpharmacy.co.uk
+              </div>
+              <div>
+                 <strong>Wilmslow:</strong> info@wilmslowpharmacy.co.uk
+              </div>
+           </div>
+           <div className="text-[10px] mt-2 opacity-75">
+              Warning: Temporary passwords in use. Please reset after testing.
+           </div>
         </div>
 
         <div className="grid gap-3 lg:grid-cols-2">
