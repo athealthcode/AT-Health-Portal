@@ -65,7 +65,7 @@ export default function Admin() {
            </div>
            <div className="text-xs grid md:grid-cols-2 lg:grid-cols-3 gap-2">
               <div>
-                 <strong>Head Office:</strong> admin@at-health.co.uk
+                 <strong>Head Office:</strong> info@at-health.co.uk
               </div>
               <div>
                  <strong>Finance:</strong> finance@at-health.co.uk

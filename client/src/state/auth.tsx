@@ -72,7 +72,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 const INITIAL_USERS: UserAccount[] = [
   { 
     id: "u1", 
-    email: "admin@at-health.co.uk", 
+    email: "info@at-health.co.uk", 
     role: "Super Admin", 
     scope: { type: "headoffice" },
     status: "active"
@@ -100,7 +100,7 @@ const INITIAL_USERS: UserAccount[] = [
   },
   {
     id: "u5",
-    email: "info@wilmslowpharmacy.co.uk",
+    email: "info@wilmslowpharmacy.co.uk", 
     role: "Pharmacy Login", 
     scope: { type: "pharmacy", pharmacyId: "wilmslow", pharmacyName: "Wilmslow Pharmacy" },
     status: "active"
