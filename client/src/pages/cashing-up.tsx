@@ -7,7 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Calendar } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { format } from "date-fns";
 
 function normalizeMoney(v: string) {
   const cleaned = v.replace(/[^0-9.-]/g, "");
@@ -19,6 +22,8 @@ function normalizeMoney(v: string) {
 export default function CashingUp() {
   const { toast } = useToast();
 
+  const [date, setDate] = useState<Date | undefined>(new Date());
+  
   const [inputs, setInputs] = useState({
     toBeBanked: 0,
     readingCard: 0,
@@ -47,6 +52,14 @@ export default function CashingUp() {
     setInputs(prev => ({ ...prev, [key]: normalizeMoney(val) }));
   };
 
+  const handleSubmit = () => {
+    if (!date) {
+      toast({ title: "Date Required", description: "Please select a trading date.", variant: "destructive" });
+      return;
+    }
+    toast({ title: "Submitted", description: `Cashing up saved for ${format(date, "PPP")}.` });
+  };
+
   return (
     <AppShell>
       <div className="flex flex-col gap-5">
@@ -59,9 +72,31 @@ export default function CashingUp() {
 
         <div className="grid gap-3 lg:grid-cols-[1fr_360px]">
           <Card className="rounded-2xl border bg-card/60 p-5" data-testid="card-cashing-up-form">
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="text-sm font-semibold">Inputs</div>
-              <Badge variant="outline">Trading Day</Badge>
+              
+              <div className="flex items-center gap-2">
+                 <Label className="text-xs text-muted-foreground uppercase tracking-wider">Trading Day:</Label>
+                 <Popover>
+                    <PopoverTrigger asChild>
+                       <Button
+                          variant="outline"
+                          className={`w-[200px] justify-start text-left font-normal ${!date && "text-muted-foreground"}`}
+                       >
+                          <Calendar className="mr-2 h-4 w-4" />
+                          {date ? format(date, "PPP") : <span>Pick a date</span>}
+                       </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="end">
+                       <CalendarComponent
+                          mode="single"
+                          selected={date}
+                          onSelect={setDate}
+                          initialFocus
+                       />
+                    </PopoverContent>
+                 </Popover>
+              </div>
             </div>
 
             <Separator className="my-4" />
@@ -137,8 +172,8 @@ export default function CashingUp() {
             <div className="mt-6 flex gap-2">
               <Button 
                 className="h-11 w-full" 
-                disabled={varianceError}
-                onClick={() => toast({ title: "Submitted", description: "Cashing up saved." })}
+                disabled={varianceError || !date}
+                onClick={handleSubmit}
               >
                 Submit Cashing Up
               </Button>

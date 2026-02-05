@@ -7,22 +7,20 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, FileText, CheckCircle2 } from "lucide-react";
 
-type ServiceField = { key: string; label: string; group: string; isCurrency?: boolean };
+type ServiceField = { key: string; label: string; group: string; isCurrency?: boolean; subGroup?: string };
 
-// Revised fields structure based on new requirements
-const fields: ServiceField[] = [
+// Prescription Figures - Special handling for Table Layout
+const PRESCRIPTION_FIELDS = [
+  { type: "Paid", epsKey: "eps_rx_paid", paperKey: "paper_rx_paid", label: "Prescriptions (Rx)" },
+  { type: "Exempt", epsKey: "eps_rx_exempt", paperKey: "paper_rx_exempt", label: "Prescriptions (Rx)" },
+  { type: "Paid", epsKey: "eps_items_paid", paperKey: "paper_items_paid", label: "Items" },
+  { type: "Exempt", epsKey: "eps_items_exempt", paperKey: "paper_items_exempt", label: "Items" },
+];
+
+const OTHER_FIELDS: ServiceField[] = [
   // FIGURES (Running totals)
-  { key: "eps_rx_paid", label: "EPS Rx Paid", group: "Figures" },
-  { key: "eps_rx_exempt", label: "EPS Rx Exempt", group: "Figures" },
-  { key: "eps_items_paid", label: "EPS Items Paid", group: "Figures" },
-  { key: "eps_items_exempt", label: "EPS Items Exempt", group: "Figures" },
-  { key: "paper_rx_paid", label: "Paper Rx Paid", group: "Figures" },
-  { key: "paper_rx_exempt", label: "Paper Rx Exempt", group: "Figures" },
-  { key: "paper_items_paid", label: "Paper Items Paid", group: "Figures" },
-  { key: "paper_items_exempt", label: "Paper Items Exempt", group: "Figures" },
-  
   { key: "ssp", label: "SSP", group: "Figures" },
   { key: "nhs_prepayment", label: "NHS Prepayment (£)", group: "Figures", isCurrency: true },
   { key: "fp57_refund", label: "FP57 Refund (£)", group: "Figures", isCurrency: true },
@@ -30,8 +28,7 @@ const fields: ServiceField[] = [
   // NMS
   { key: "nms_intervention", label: "NMS Intervention", group: "NMS" },
   { key: "nms_follow_up", label: "NMS Follow-up", group: "NMS" },
-  // Total NMS computed
-
+  
   // DMS
   { key: "dms_stage_1", label: "Stage 1", group: "DMS" },
   { key: "dms_stage_2", label: "Stage 2", group: "DMS" },
@@ -73,21 +70,30 @@ export default function DailyFigures() {
   const { toast } = useToast();
   const [values, setValues] = useState<Record<string, number>>(() => {
     const init: Record<string, number> = {};
-    for (const f of fields) init[f.key] = 0;
+    PRESCRIPTION_FIELDS.forEach(f => {
+      init[f.epsKey] = 0;
+      init[f.paperKey] = 0;
+    });
+    OTHER_FIELDS.forEach(f => { init[f.key] = 0; });
     return init;
   });
 
   // Computed NMS Total
   const nmsTotal = (values["nms_intervention"] || 0) + (values["nms_follow_up"] || 0);
 
-  const grouped = useMemo(() => {
+  const groupedOther = useMemo(() => {
     const groups: Record<string, ServiceField[]> = {};
-    for (const f of fields) {
+    for (const f of OTHER_FIELDS) {
       groups[f.group] ||= [];
       groups[f.group].push(f);
     }
     return groups;
   }, []);
+
+  const updateValue = (key: string, valStr: string, isCurrency = false) => {
+      const val = isCurrency ? normalizeFloat(valStr) : normalizeInt(valStr);
+      setValues(s => ({ ...s, [key]: val }));
+  };
 
   return (
     <AppShell>
@@ -102,14 +108,103 @@ export default function DailyFigures() {
 
         <div className="grid gap-3 lg:grid-cols-[1fr_320px]">
           <div className="space-y-6">
-            {Object.entries(grouped).map(([group, groupFields]) => (
+            
+            {/* PRESCRIPTION FIGURES GRID */}
+            <Card className="rounded-2xl border bg-card/60 p-5 overflow-hidden" data-testid="card-group-prescription">
+               <div className="flex items-center gap-2 mb-5">
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                     <FileText className="h-4 w-4" />
+                  </div>
+                  <div className="text-sm font-semibold tracking-wide uppercase text-foreground">Prescription Figures</div>
+               </div>
+
+               <div className="grid grid-cols-[1fr_1fr_1fr] gap-4 mb-2 px-2">
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Type</div>
+                  <div className="text-xs font-semibold text-primary uppercase tracking-wider text-center bg-primary/5 rounded py-1">EPS (Electronic)</div>
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center bg-muted/50 rounded py-1">Paper</div>
+               </div>
+               
+               <div className="space-y-4">
+                  <div className="space-y-2">
+                      <div className="text-xs font-bold text-foreground px-2">Paid</div>
+                      <div className="grid grid-cols-[1fr_1fr_1fr] gap-4 items-center bg-slate-50/50 p-2 rounded-lg border border-transparent hover:border-border transition-colors">
+                          <div className="text-sm font-medium text-muted-foreground">Prescriptions (Rx)</div>
+                          <Input 
+                             className="h-10 text-center font-mono border-primary/20 focus-visible:ring-primary/20" 
+                             value={values["eps_rx_paid"]}
+                             onChange={e => updateValue("eps_rx_paid", e.target.value)}
+                             placeholder="0"
+                          />
+                          <Input 
+                             className="h-10 text-center font-mono" 
+                             value={values["paper_rx_paid"]}
+                             onChange={e => updateValue("paper_rx_paid", e.target.value)}
+                             placeholder="0"
+                          />
+                      </div>
+                      <div className="grid grid-cols-[1fr_1fr_1fr] gap-4 items-center bg-slate-50/50 p-2 rounded-lg border border-transparent hover:border-border transition-colors">
+                          <div className="text-sm font-medium text-muted-foreground">Items</div>
+                          <Input 
+                             className="h-10 text-center font-mono border-primary/20 focus-visible:ring-primary/20" 
+                             value={values["eps_items_paid"]}
+                             onChange={e => updateValue("eps_items_paid", e.target.value)}
+                             placeholder="0"
+                          />
+                          <Input 
+                             className="h-10 text-center font-mono" 
+                             value={values["paper_items_paid"]}
+                             onChange={e => updateValue("paper_items_paid", e.target.value)}
+                             placeholder="0"
+                          />
+                      </div>
+                  </div>
+
+                  <Separator />
+
+                  <div className="space-y-2">
+                      <div className="text-xs font-bold text-foreground px-2">Exempt</div>
+                      <div className="grid grid-cols-[1fr_1fr_1fr] gap-4 items-center bg-slate-50/50 p-2 rounded-lg border border-transparent hover:border-border transition-colors">
+                          <div className="text-sm font-medium text-muted-foreground">Prescriptions (Rx)</div>
+                          <Input 
+                             className="h-10 text-center font-mono border-primary/20 focus-visible:ring-primary/20" 
+                             value={values["eps_rx_exempt"]}
+                             onChange={e => updateValue("eps_rx_exempt", e.target.value)}
+                             placeholder="0"
+                          />
+                          <Input 
+                             className="h-10 text-center font-mono" 
+                             value={values["paper_rx_exempt"]}
+                             onChange={e => updateValue("paper_rx_exempt", e.target.value)}
+                             placeholder="0"
+                          />
+                      </div>
+                      <div className="grid grid-cols-[1fr_1fr_1fr] gap-4 items-center bg-slate-50/50 p-2 rounded-lg border border-transparent hover:border-border transition-colors">
+                          <div className="text-sm font-medium text-muted-foreground">Items</div>
+                          <Input 
+                             className="h-10 text-center font-mono border-primary/20 focus-visible:ring-primary/20" 
+                             value={values["eps_items_exempt"]}
+                             onChange={e => updateValue("eps_items_exempt", e.target.value)}
+                             placeholder="0"
+                          />
+                          <Input 
+                             className="h-10 text-center font-mono" 
+                             value={values["paper_items_exempt"]}
+                             onChange={e => updateValue("paper_items_exempt", e.target.value)}
+                             placeholder="0"
+                          />
+                      </div>
+                  </div>
+               </div>
+            </Card>
+
+            {Object.entries(groupedOther).map(([group, groupFields]) => (
               <Card key={group} className="rounded-2xl border bg-card/60 p-5" data-testid={`card-group-${group}`}>
                 <div className="flex items-center justify-between mb-4">
-                  <div className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+                  <div className="text-sm font-semibold tracking-wide text-foreground uppercase">
                     {group}
                   </div>
                   {group === "NMS" && (
-                    <Badge variant="secondary">Combined: {nmsTotal}</Badge>
+                    <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">Combined: {nmsTotal}</Badge>
                   )}
                 </div>
                 
@@ -122,12 +217,7 @@ export default function DailyFigures() {
                       <Input
                         inputMode={f.isCurrency ? "decimal" : "numeric"}
                         value={String(values[f.key] ?? 0)}
-                        onChange={(e) => {
-                          const val = f.isCurrency 
-                            ? normalizeFloat(e.target.value) 
-                            : normalizeInt(e.target.value);
-                          setValues((s) => ({ ...s, [f.key]: val }));
-                        }}
+                        onChange={(e) => updateValue(f.key, e.target.value, f.isCurrency)}
                         onBlur={() => {
                           const cur = values[f.key];
                           if (cur === undefined || cur === null || Number.isNaN(cur)) {
@@ -170,7 +260,11 @@ export default function DailyFigures() {
                     className="w-full h-11"
                     onClick={() => {
                       const next: Record<string, number> = {};
-                      for (const f of fields) next[f.key] = 0;
+                      PRESCRIPTION_FIELDS.forEach(f => {
+                          next[f.epsKey] = 0;
+                          next[f.paperKey] = 0;
+                      });
+                      OTHER_FIELDS.forEach(f => { next[f.key] = 0; });
                       setValues(next);
                     }}
                   >
@@ -190,9 +284,9 @@ export default function DailyFigures() {
                <div className="rounded-lg bg-background/50 p-3 flex justify-between items-center">
                   <div>
                     <div className="text-xs text-muted-foreground">Active</div>
-                    <div className="text-xl font-mono font-medium">4,120</div>
+                    <div className="text-xl font-mono font-medium text-foreground">4,120</div>
                   </div>
-                  <Badge className="bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 border-emerald-500/20">
+                  <Badge className="bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 border-emerald-500/20 shadow-none">
                     +12
                   </Badge>
                </div>

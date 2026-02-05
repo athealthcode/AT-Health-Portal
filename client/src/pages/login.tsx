@@ -6,11 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/state/auth";
-import { ShieldCheck, Mail, Network } from "lucide-react";
+import { Network, ArrowRight, Mail } from "lucide-react";
+import atLogo from "@/assets/logo.png";
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -41,234 +41,197 @@ export default function Login() {
   }, [email]);
 
   return (
-    <div className="min-h-dvh app-bg relative">
+    <div className="min-h-dvh app-bg flex flex-col justify-center items-center p-4 relative overflow-hidden">
       <div className="noise-overlay" />
-      <div className="mx-auto max-w-6xl px-5 py-10">
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: [0.2, 0.8, 0.2, 1] }}
-          className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]"
-        >
-          <div className="flex flex-col justify-center">
-            <div className="inline-flex items-center gap-2">
-              <div className="h-10 w-10 rounded-2xl bg-primary text-primary-foreground grid place-items-center shadow-lg">
-                <span className="font-mono text-sm">AT</span>
-              </div>
-              <div>
-                <div className="font-serif text-2xl tracking-tight">AT Health Portal</div>
-                <div className="text-sm text-muted-foreground">Intranet for pharmacies and head office</div>
-              </div>
-            </div>
-
-            <div className="mt-7 space-y-3">
-              <div className="text-3xl font-semibold tracking-tight">Sign in</div>
-              <div className="text-muted-foreground leading-relaxed">
-                Invited users only. Registration is disabled.
-              </div>
-            </div>
-
-            <div className="mt-6 flex flex-wrap gap-2">
-              <Badge variant="secondary" data-testid="badge-security">
-                <ShieldCheck className="h-3 w-3 mr-1" />
-                IP Allowlisted
-              </Badge>
-              <Badge variant="secondary" data-testid="badge-mfa">
-                <Mail className="h-3 w-3 mr-1" />
-                Email OTP Required
-              </Badge>
-            </div>
-
-            <div className="mt-10 space-y-2 text-xs text-muted-foreground">
-              <div data-testid="text-security-note">
-                Security: Pre-created users only. IP allowlist enforced server-side.
-              </div>
-              <div className="pt-4 cursor-pointer hover:text-primary" onClick={() => setShowDev(!showDev)}>
-                 Build v0.4.2 {showDev ? "(Dev Mode Active)" : ""}
-              </div>
-              {showDev && (
-                 <div className="p-3 border rounded bg-background/50 backdrop-blur-sm space-y-2 max-w-xs">
-                    <div className="font-mono font-bold">Simulate Network</div>
-                    <div className="flex gap-2">
-                       <Input value={devIp} onChange={e => setDevIp(e.target.value)} className="h-8 font-mono text-xs" />
-                       <Button size="sm" variant="outline" className="h-8" onClick={() => {
-                          setSimulatedIp(devIp);
-                          toast({ title: "IP Changed", description: `Simulated IP: ${devIp}` });
-                       }}>Set IP</Button>
-                    </div>
-                    <div className="text-[10px] text-muted-foreground">
-                       Current: {session.currentIp}
-                    </div>
-                 </div>
-              )}
-            </div>
+      
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.5, ease: [0.2, 0.8, 0.2, 1] }}
+        className="w-full max-w-md z-10"
+      >
+        <div className="flex flex-col items-center mb-8">
+          <div className="w-20 h-20 mb-4 bg-white rounded-2xl shadow-sm p-3 flex items-center justify-center">
+            <img src={atLogo} alt="AT Health Logo" className="w-full h-full object-contain" />
           </div>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">AT Health Portal</h1>
+          <p className="text-sm text-muted-foreground mt-2">Sign in to your account</p>
+        </div>
 
-          <Card className="surface rounded-2xl p-6 md:p-7">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="text-lg font-semibold tracking-tight" data-testid="text-login-title">
-                  {step === "login" ? "Company Sign In" : "Email Verification"}
+        <Card className="surface rounded-2xl p-6 md:p-8 shadow-xl">
+          {networkMessage && (
+             <div className="mb-6 p-3 bg-amber-50 border border-amber-200 rounded-md flex items-center gap-2 text-sm text-amber-900 animate-in fade-in slide-in-from-top-1">
+                <Network className="h-4 w-4" />
+                {networkMessage}
+             </div>
+          )}
+
+          <div className="space-y-4">
+            {step === "login" ? (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="text-foreground/80">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="name@athealth.co.uk"
+                    className="h-11 bg-background"
+                    autoComplete="email"
+                  />
+                  {invitedHint && (
+                    <div className="text-xs text-muted-foreground">{invitedHint}</div>
+                  )}
                 </div>
-                <div className="text-sm text-muted-foreground" data-testid="text-login-subtitle">
-                  {step === "login"
-                    ? "Enter your credentials."
-                    : `Enter the code sent to ${email}`}
+
+                <div className="space-y-2">
+                  <Label htmlFor="password" className="text-foreground/80">Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="h-11 bg-background"
+                    autoComplete="current-password"
+                  />
                 </div>
-              </div>
-            </div>
 
-            {networkMessage && (
-               <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md flex items-center gap-2 text-sm text-amber-900 animate-in fade-in slide-in-from-top-1">
-                  <Network className="h-4 w-4" />
-                  {networkMessage}
-               </div>
-            )}
-
-            <div className="mt-6 space-y-4">
-              {step === "login" ? (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="email" data-testid="label-email">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="name@athealth.co.uk"
-                      className="h-11"
-                      data-testid="input-email"
-                      autoComplete="email"
-                    />
-                    {invitedHint ? (
-                      <div className="text-xs text-muted-foreground" data-testid="text-invite-hint">{invitedHint}</div>
-                    ) : null}
+                <Button
+                  className="h-11 w-full text-base font-medium mt-2"
+                  disabled={!email.trim() || password.length < 6 || isLoading}
+                  onClick={async () => {
+                    setIsLoading(true);
+                    setNetworkMessage(null);
+                    try {
+                      const res = await signIn({ email, password });
+                      if (res.next === "mfa") {
+                        setStep("mfa");
+                        toast({ title: "OTP Sent", description: "Check your email for the code." });
+                        if (res.message) setNetworkMessage(res.message);
+                      }
+                    } catch (e) {
+                       toast({ title: "Access Denied", description: "Invalid credentials or not invited.", variant: "destructive" });
+                    } finally {
+                      setIsLoading(false);
+                    }
+                  }}
+                >
+                  Continue <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </>
+            ) : (
+              <>
+                <div className="space-y-4 text-center mb-6">
+                  <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary mb-2">
+                    <Mail className="h-6 w-6" />
                   </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="password" data-testid="label-password">Password</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className="h-11"
-                      data-testid="input-password"
-                      autoComplete="current-password"
-                    />
+                  <div>
+                    <h3 className="font-semibold text-foreground">Enter Verification Code</h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      We sent a 6-digit code to <span className="font-medium text-foreground">{email}</span>
+                    </p>
                   </div>
+                </div>
 
+                <div className="flex justify-center py-2">
+                  <InputOTP
+                    maxLength={6}
+                    value={code}
+                    onChange={setCode}
+                  >
+                    <InputOTPGroup>
+                      {Array.from({ length: 6 }).map((_, i) => (
+                        <InputOTPSlot key={i} index={i} className="h-12 w-10 sm:h-14 sm:w-12 text-lg" />
+                      ))}
+                    </InputOTPGroup>
+                  </InputOTP>
+                </div>
+
+                <div className="flex items-start space-x-3 py-3 px-1">
+                  <Checkbox 
+                    id="trust" 
+                    checked={trustDevice} 
+                    onCheckedChange={(c) => setTrustDevice(!!c)}
+                    className="mt-1"
+                  />
+                  <div className="grid gap-1.5 leading-none">
+                    <Label
+                      htmlFor="trust"
+                      className="text-sm font-medium leading-none cursor-pointer"
+                    >
+                      Trust this browser for 7 days
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Only enable this on devices you own.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid gap-3 pt-2">
                   <Button
-                    className="h-11 w-full"
-                    data-testid="button-login"
-                    disabled={!email.trim() || password.length < 6 || isLoading}
+                    className="h-11 w-full text-base"
+                    disabled={code.length !== 6 || isLoading}
                     onClick={async () => {
                       setIsLoading(true);
-                      setNetworkMessage(null);
                       try {
-                        const res = await signIn({ email, password });
-                        if (res.next === "mfa") {
-                          setStep("mfa");
-                          toast({ title: "OTP Sent", description: "Check your email for the code." });
-                          if (res.message) setNetworkMessage(res.message);
-                        }
-                      } catch (e) {
-                         toast({ title: "Access Denied", description: "Invalid credentials or not invited.", variant: "destructive" });
+                        const res = await signIn({ email, password, otp: code, trustDevice });
+                        if (res.next === "staff-picker") setLocation("/pin");
                       } finally {
                         setIsLoading(false);
                       }
                     }}
                   >
-                    Continue
+                    Verify & Sign In
                   </Button>
-                </>
-              ) : (
-                <>
-                  <div className="space-y-2">
-                    <Label data-testid="label-mfa-code">Email OTP</Label>
-                    <div className="flex items-center justify-between gap-3">
-                      <InputOTP
-                        maxLength={6}
-                        value={code}
-                        onChange={setCode}
-                        data-testid="input-mfa"
-                      >
-                        <InputOTPGroup>
-                          {Array.from({ length: 6 }).map((_, i) => (
-                            <InputOTPSlot key={i} index={i} />
-                          ))}
-                        </InputOTPGroup>
-                      </InputOTP>
-                    </div>
-                    <div className="text-xs text-muted-foreground" data-testid="text-mfa-hint">
-                      One-time code sent to your registered email.
-                    </div>
-                  </div>
+                  <Button
+                    variant="ghost"
+                    className="h-11 w-full text-muted-foreground hover:text-foreground"
+                    onClick={() => {
+                      setStep("login");
+                      setCode("");
+                      setNetworkMessage(null);
+                    }}
+                  >
+                    Back to Login
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        </Card>
 
-                  <div className="flex items-start space-x-2 py-2">
-                    <Checkbox 
-                      id="trust" 
-                      checked={trustDevice} 
-                      onCheckedChange={(c) => setTrustDevice(!!c)} 
-                    />
-                    <div className="grid gap-1.5 leading-none">
-                      <Label
-                        htmlFor="trust"
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                      >
-                        Trust this browser for 7 days
-                      </Label>
-                      <p className="text-[0.8rem] text-muted-foreground">
-                        Only works on this device and network.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <Button
-                      variant="secondary"
-                      className="h-11"
-                      data-testid="button-back-login"
-                      onClick={() => {
-                        setStep("login");
-                        setCode("");
-                        setNetworkMessage(null);
-                      }}
-                    >
-                      Back
-                    </Button>
-                    <Button
-                      className="h-11"
-                      data-testid="button-verify-mfa"
-                      disabled={code.length !== 6 || isLoading}
-                      onClick={async () => {
-                        setIsLoading(true);
-                        try {
-                          const res = await signIn({ email, password, otp: code, trustDevice });
-                          if (res.next === "staff-picker") setLocation("/pin");
-                        } finally {
-                          setIsLoading(false);
-                        }
-                      }}
-                    >
-                      Verify
-                    </Button>
-                  </div>
-                </>
-              )}
-            </div>
-
-            <div className="mt-6 flex items-center justify-between text-xs text-muted-foreground">
-              <div className="flex items-center gap-1">
-                 <ShieldCheck className="h-3 w-3" />
-                 <span>Official Use Only</span>
-              </div>
-              <div data-testid="text-session-timeout">Inactivity timeout enabled</div>
-            </div>
-          </Card>
-        </motion.div>
-      </div>
+        <div className="mt-8 text-center space-y-4">
+           <div className="text-xs text-muted-foreground flex justify-center gap-4">
+              <span>Secure Connection</span>
+              <span>•</span>
+              <span>Privacy Policy</span>
+              <span>•</span>
+              <span className="cursor-pointer hover:text-primary transition-colors" onClick={() => setShowDev(!showDev)}>v0.4.3</span>
+           </div>
+           
+           {showDev && (
+             <motion.div 
+               initial={{ opacity: 0, height: 0 }}
+               animate={{ opacity: 1, height: "auto" }}
+               className="mx-auto max-w-xs p-3 border rounded-lg bg-white/50 backdrop-blur-sm text-left"
+             >
+                <div className="font-mono text-xs font-bold mb-2">Dev: Network Simulation</div>
+                <div className="flex gap-2">
+                   <Input value={devIp} onChange={e => setDevIp(e.target.value)} className="h-8 font-mono text-xs bg-white" />
+                   <Button size="sm" variant="outline" className="h-8" onClick={() => {
+                      setSimulatedIp(devIp);
+                      toast({ title: "IP Changed", description: `Simulated IP: ${devIp}` });
+                   }}>Set</Button>
+                </div>
+                <div className="text-[10px] text-muted-foreground mt-1">
+                   Current: {session.currentIp}
+                </div>
+             </motion.div>
+           )}
+        </div>
+      </motion.div>
     </div>
   );
 }
