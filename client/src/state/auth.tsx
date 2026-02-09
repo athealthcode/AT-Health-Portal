@@ -381,10 +381,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     // CHECK MASTER PIN OWNERSHIP
-    const isMasterPin = pin === MASTER_PIN;
-    let isCorrect = pin === STAFF_PIN; // Default correct
+    const cleanPin = pin.trim();
+    const isMasterPin = cleanPin === MASTER_PIN;
+    let isCorrect = cleanPin === STAFF_PIN; // Default correct
 
     if (isMasterPin) {
+       console.log("[Auth] Master PIN attempt by:", session.userEmail);
        // Only allowed if email is ahmed@at-health.co.uk
        if (session.userEmail?.toLowerCase() === "ahmed@at-health.co.uk") {
           isCorrect = true;
