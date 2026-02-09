@@ -44,6 +44,11 @@ export default function Dashboard() {
                  </div>
                  <div className="flex items-center gap-2">
                     <Badge variant="outline" className="bg-background/50">Month to Date</Badge>
+                    <Link href="/bonus-performance">
+                       <Button size="sm" className="gap-2">
+                          <Award className="h-4 w-4" /> Manage Bonuses
+                       </Button>
+                    </Link>
                  </div>
               </div>
 

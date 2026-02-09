@@ -11,6 +11,7 @@ import {
   Building2,
   ChevronDown,
   BookOpen,
+  Award,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -51,6 +52,13 @@ export function AppShell({ children }: PropsWithChildren) {
         icon: BarChart3,
         testId: "link-nav-reports",
         requiresRole: (r) => r === "Finance" || r === "Head Office Admin" || r === "Super Admin",
+      },
+      {
+        href: "/bonus-performance",
+        label: "Bonus & Performance",
+        icon: Award,
+        testId: "link-nav-bonus",
+        requiresRole: (r) => r === "Head Office Admin" || r === "Super Admin",
       },
       {
         href: "/documents",
