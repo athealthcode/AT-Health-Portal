@@ -12,8 +12,12 @@ import {
   TrendingUp,
   Files,
   ArrowUpRight,
-  Calendar
+  Calendar,
+  BarChart3,
+  Award,
+  Users
 } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
 
 export default function Dashboard() {
   const { session } = useAuth();
@@ -22,6 +26,127 @@ export default function Dashboard() {
     { id: 2, title: "Complete Cashing Up", due: "Today, 6:30 PM", urgency: "medium", href: "/cashing-up" },
   ]);
 
+  const isAhmed = session.userEmail?.toLowerCase() === "ahmed@at-health.co.uk";
+  
+  if (isAhmed) {
+     // AHMED'S GLOBAL DASHBOARD
+     return (
+        <AppShell>
+           <div className="flex flex-col gap-8">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+                 <div>
+                    <h1 className="font-serif text-3xl md:text-4xl tracking-tight text-foreground mb-2">
+                       Good afternoon, Ahmed
+                    </h1>
+                    <p className="text-muted-foreground">
+                       Network Performance Overview • {new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}
+                    </p>
+                 </div>
+                 <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="bg-background/50">Month to Date</Badge>
+                 </div>
+              </div>
+
+              {/* KPI CARDS GLOBAL */}
+              <div className="grid gap-4 md:grid-cols-4">
+                 <Card className="p-5 rounded-2xl border bg-card/60">
+                    <div className="text-sm font-medium text-muted-foreground mb-2">Total Items</div>
+                    <div className="text-3xl font-bold font-mono">24,812</div>
+                    <div className="text-xs text-emerald-600 flex items-center mt-1"><ArrowUpRight className="h-3 w-3 mr-1"/> +4.2% vs last mth</div>
+                 </Card>
+                 <Card className="p-5 rounded-2xl border bg-card/60">
+                    <div className="text-sm font-medium text-muted-foreground mb-2">Total NMS</div>
+                    <div className="text-3xl font-bold font-mono">142</div>
+                    <div className="text-xs text-emerald-600 flex items-center mt-1"><ArrowUpRight className="h-3 w-3 mr-1"/> +12 vs last mth</div>
+                 </Card>
+                 <Card className="p-5 rounded-2xl border bg-card/60">
+                    <div className="text-sm font-medium text-muted-foreground mb-2">Pharmacy First</div>
+                    <div className="text-3xl font-bold font-mono">89</div>
+                    <div className="text-xs text-emerald-600 flex items-center mt-1"><ArrowUpRight className="h-3 w-3 mr-1"/> +5 vs last mth</div>
+                 </Card>
+                 <Card className="p-5 rounded-2xl border bg-card/60">
+                    <div className="text-sm font-medium text-muted-foreground mb-2">Nominations</div>
+                    <div className="text-3xl font-bold font-mono">12,450</div>
+                    <div className="text-xs text-emerald-600 flex items-center mt-1"><ArrowUpRight className="h-3 w-3 mr-1"/> +128 vs last mth</div>
+                 </Card>
+              </div>
+
+              {/* LEADERBOARDS */}
+              <div className="grid gap-6 lg:grid-cols-2">
+                 <Card className="p-6 rounded-2xl border bg-card/60">
+                    <div className="flex items-center justify-between mb-4">
+                       <h3 className="font-semibold flex items-center gap-2"><BarChart3 className="h-4 w-4" /> Service Performance</h3>
+                       <span className="text-xs text-muted-foreground">Highest to Lowest</span>
+                    </div>
+                    <div className="space-y-4">
+                       <div className="space-y-2">
+                          <div className="text-xs font-semibold uppercase text-muted-foreground">Total NMS</div>
+                          {[{n:"Bowland", v:62}, {n:"Denton", v:48}, {n:"Wilmslow", v:32}].map((x, i) => (
+                             <div key={x.n} className="flex items-center justify-between p-2 rounded-lg bg-background/40">
+                                <div className="flex items-center gap-2">
+                                   <div className="text-xs font-mono text-muted-foreground w-4">{i+1}</div>
+                                   <div className="text-sm font-medium">{x.n}</div>
+                                </div>
+                                <div className="font-mono font-bold">{x.v}</div>
+                             </div>
+                          ))}
+                       </div>
+                       <Separator />
+                       <div className="space-y-2">
+                          <div className="text-xs font-semibold uppercase text-muted-foreground">Pharmacy First</div>
+                          {[{n:"Denton", v:41}, {n:"Bowland", v:30}, {n:"Wilmslow", v:18}].map((x, i) => (
+                             <div key={x.n} className="flex items-center justify-between p-2 rounded-lg bg-background/40">
+                                <div className="flex items-center gap-2">
+                                   <div className="text-xs font-mono text-muted-foreground w-4">{i+1}</div>
+                                   <div className="text-sm font-medium">{x.n}</div>
+                                </div>
+                                <div className="font-mono font-bold">{x.v}</div>
+                             </div>
+                          ))}
+                       </div>
+                    </div>
+                 </Card>
+
+                 <Card className="p-6 rounded-2xl border bg-card/60">
+                    <div className="flex items-center justify-between mb-4">
+                       <h3 className="font-semibold flex items-center gap-2"><Users className="h-4 w-4" /> Growth Metrics</h3>
+                       <span className="text-xs text-muted-foreground">Highest to Lowest</span>
+                    </div>
+                    <div className="space-y-4">
+                       <div className="space-y-2">
+                          <div className="text-xs font-semibold uppercase text-muted-foreground">Nominations (Growth)</div>
+                          {[{n:"Wilmslow", v:"+42"}, {n:"Bowland", v:"+38"}, {n:"Denton", v:"+15"}].map((x, i) => (
+                             <div key={x.n} className="flex items-center justify-between p-2 rounded-lg bg-background/40">
+                                <div className="flex items-center gap-2">
+                                   <div className="text-xs font-mono text-muted-foreground w-4">{i+1}</div>
+                                   <div className="text-sm font-medium">{x.n}</div>
+                                </div>
+                                <div className="font-mono font-bold text-emerald-600">{x.v}</div>
+                             </div>
+                          ))}
+                       </div>
+                       <Separator />
+                       <div className="space-y-2">
+                          <div className="text-xs font-semibold uppercase text-muted-foreground">Items Dispensed</div>
+                          {[{n:"Bowland", v:"9,120"}, {n:"Denton", v:"8,405"}, {n:"Wilmslow", v:"7,287"}].map((x, i) => (
+                             <div key={x.n} className="flex items-center justify-between p-2 rounded-lg bg-background/40">
+                                <div className="flex items-center gap-2">
+                                   <div className="text-xs font-mono text-muted-foreground w-4">{i+1}</div>
+                                   <div className="text-sm font-medium">{x.n}</div>
+                                </div>
+                                <div className="font-mono font-bold">{x.v}</div>
+                             </div>
+                          ))}
+                       </div>
+                    </div>
+                 </Card>
+              </div>
+           </div>
+        </AppShell>
+     );
+  }
+
+  // PHARMACY DASHBOARD (Existing view + Updates)
   return (
     <AppShell>
       <div className="flex flex-col gap-8">
@@ -123,21 +248,37 @@ export default function Dashboard() {
               </div>
            </Card>
 
-           {/* NOMINATIONS WIDGET */}
+           {/* MONTHLY METRICS VS PREVIOUS */}
            <Card className="p-6 rounded-2xl border bg-card/60 flex flex-col justify-between">
-              <div>
-                 <div className="text-sm font-medium text-muted-foreground mb-1">Weekly Nominations</div>
-                 <div className="text-3xl font-bold font-mono text-foreground">4,120</div>
-                 <div className="flex items-center gap-2 mt-2">
-                    <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-emerald-200 shadow-none">
-                       <ArrowUpRight className="h-3 w-3 mr-1" />
-                       +12
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">vs last week</span>
-                 </div>
+              <div className="mb-4">
+                 <h3 className="font-semibold mb-1">Performance (MTD)</h3>
+                 <div className="text-xs text-muted-foreground">vs Previous Month</div>
               </div>
-              <div className="mt-8 pt-4 border-t text-xs text-muted-foreground">
-                 Week ending: {new Date().toLocaleDateString('en-GB')}
+              
+              <div className="space-y-4">
+                 <div className="flex items-center justify-between">
+                    <span className="text-sm">Items</span>
+                    <div className="text-right">
+                       <div className="font-mono font-bold">9,120</div>
+                       <div className="text-[10px] text-emerald-600 flex items-center justify-end"><ArrowUpRight className="h-2 w-2 mr-1"/> +2.1%</div>
+                    </div>
+                 </div>
+                 <Separator />
+                 <div className="flex items-center justify-between">
+                    <span className="text-sm">NMS</span>
+                    <div className="text-right">
+                       <div className="font-mono font-bold">62</div>
+                       <div className="text-[10px] text-emerald-600 flex items-center justify-end"><ArrowUpRight className="h-2 w-2 mr-1"/> +8</div>
+                    </div>
+                 </div>
+                 <Separator />
+                 <div className="flex items-center justify-between">
+                    <span className="text-sm">Nominations</span>
+                    <div className="text-right">
+                       <div className="font-mono font-bold">4,120</div>
+                       <div className="text-[10px] text-emerald-600 flex items-center justify-end"><ArrowUpRight className="h-2 w-2 mr-1"/> +12</div>
+                    </div>
+                 </div>
               </div>
            </Card>
         </div>

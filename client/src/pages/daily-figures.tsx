@@ -15,6 +15,7 @@ import { useSubmittedDays } from "@/hooks/use-submitted-days";
 import { useAuth } from "@/state/auth";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Link, useLocation } from "wouter";
 
 type ServiceField = { key: string; label: string; group: string; isCurrency?: boolean; subGroup?: string };
 
@@ -56,9 +57,9 @@ function normalizeInt(v: string) {
 
 function normalizeFloat(v: string) {
   if (v === "") return "";
-  const n = Number.parseFloat(v.replace(/[^0-9.-]/g, ""));
-  if (!Number.isFinite(n)) return "";
-  return n;
+  // Allow simple typing like "9.9" or "9.90"
+  // Just strip illegal chars but keep dot
+  return v.replace(/[^0-9.]/g, "");
 }
 
 function formatCurrency(v: string | number) {
@@ -68,6 +69,7 @@ function formatCurrency(v: string | number) {
 }
 
 export default function DailyFigures() {
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { session } = useAuth();
   const { isSubmitted, markSubmitted } = useSubmittedDays("figures");
@@ -114,6 +116,15 @@ export default function DailyFigures() {
       setValues(s => ({ ...s, [key]: val }));
       setValidationError(null);
       setHighlightMissing(false);
+  };
+
+  const handleBlur = (key: string, isCurrency: boolean) => {
+     if (isCurrency && values[key] !== "") {
+        const num = parseFloat(values[key] as string);
+        if (!Number.isNaN(num)) {
+           setValues(s => ({ ...s, [key]: num.toFixed(2) }));
+        }
+     }
   };
 
   const validate = () => {
@@ -240,6 +251,10 @@ export default function DailyFigures() {
   }
 
   if (view === "summary" && lastSubmittedValues) {
+     const prescriptionTotal = PRESCRIPTION_FIELDS.reduce((acc, f) => 
+        acc + Number(lastSubmittedValues[f.epsKey] || 0) + Number(lastSubmittedValues[f.paperKey] || 0), 0
+     );
+
      return (
         <AppShell>
            <div className="flex flex-col gap-6 max-w-2xl mx-auto items-center justify-center min-h-[60vh]">
@@ -256,29 +271,32 @@ export default function DailyFigures() {
               <Card className="w-full p-6 mt-4 bg-card/60">
                  <h3 className="text-sm font-semibold mb-4 uppercase tracking-wider text-muted-foreground">Summary of Entry</h3>
                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div className="flex justify-between border-b pb-2">
-                       <span>NHS Prepayment</span>
-                       <span className="font-mono font-medium">{formatCurrency(lastSubmittedValues["nhs_prepayment"])}</span>
-                    </div>
-                    <div className="flex justify-between border-b pb-2">
-                       <span>FP57 Refund</span>
-                       <span className="font-mono font-medium">{formatCurrency(lastSubmittedValues["fp57_refund"])}</span>
-                    </div>
-                    <div className="flex justify-between border-b pb-2">
-                       <span>Total NMS</span>
-                       <span className="font-mono font-medium">
-                          {(Number(lastSubmittedValues["nms_intervention"]) || 0) + (Number(lastSubmittedValues["nms_follow_up"]) || 0)}
-                       </span>
-                    </div>
-                    <div className="flex justify-between border-b pb-2">
-                       <span>Flu Vaccinations</span>
-                       <span className="font-mono font-medium">{lastSubmittedValues["flu"]}</span>
-                    </div>
+                    {PRESCRIPTION_FIELDS.map(f => (
+                       <>
+                          <div className="flex justify-between border-b pb-2 text-muted-foreground" key={`${f.epsKey}-label`}>
+                             <span>EPS {f.label} ({f.type})</span>
+                             <span className="font-mono font-medium text-foreground">{lastSubmittedValues[f.epsKey]}</span>
+                          </div>
+                          <div className="flex justify-between border-b pb-2 text-muted-foreground" key={`${f.paperKey}-label`}>
+                             <span>Paper {f.label} ({f.type})</span>
+                             <span className="font-mono font-medium text-foreground">{lastSubmittedValues[f.paperKey]}</span>
+                          </div>
+                       </>
+                    ))}
+                    
+                    {OTHER_FIELDS.map(f => (
+                       <div key={f.key} className="flex justify-between border-b pb-2">
+                          <span>{f.label}</span>
+                          <span className="font-mono font-medium">
+                             {f.isCurrency ? formatCurrency(lastSubmittedValues[f.key]) : lastSubmittedValues[f.key]}
+                          </span>
+                       </div>
+                    ))}
                  </div>
               </Card>
 
               <div className="flex gap-4 w-full">
-                 <Button variant="outline" className="flex-1 h-12" onClick={() => window.location.href = "/"}>
+                 <Button variant="outline" className="flex-1 h-12" onClick={() => setLocation("/")}>
                     <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
                  </Button>
                  <Button className="flex-1 h-12" onClick={() => { setView("form"); setLastSubmittedValues(null); setDate(undefined); }}>
@@ -442,6 +460,7 @@ export default function DailyFigures() {
                         inputMode={f.isCurrency ? "decimal" : "numeric"}
                         value={values[f.key]}
                         onChange={(e) => updateValue(f.key, e.target.value, f.isCurrency)}
+                        onBlur={() => handleBlur(f.key, !!f.isCurrency)}
                         className={`h-10 font-mono bg-background/50 ${highlightMissing && values[f.key] === "" ? "border-destructive ring-destructive/20" : ""}`}
                         data-testid={`input-${f.key}`}
                         placeholder=""

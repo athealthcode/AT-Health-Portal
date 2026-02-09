@@ -1,0 +1,151 @@
+Implement the following fixes and enhancements.
+
+A) ACCOUNTS, ROLES, AND PIN OWNERSHIP
+- Rename the Master staff identity to "Ahmed" and ensure the Master PIN 145891 can only be used when the email session user is ahmed@at-health.co.uk.
+- Ensure info@at-health.co.uk is Head Office Admin only.
+- Ensure finance@at-health.co.uk is Finance only.
+- Ensure staff PIN entry fields are blank (no prefill), numeric only, 4–8 digits.
+- Hide any Super Admin or Master UI indicators for all users; keep Master capability behind ahmed@at-health.co.uk only.
+
+B) DASHBOARD METRICS AND COMPARISONS
+- For Ahmed dashboard: show a consolidated AT Health snapshot across all pharmacies with leaderboards ordered highest to lowest for:
+  - Current month-to-date Total Figures
+  - Current month-to-date Total NMS
+  - Current month-to-date Total Pharmacy First
+  - Current month-to-date Nominations
+  Provide per-pharmacy breakdown rows for each category.
+- For each pharmacy dashboard: show its own month-to-date overview plus comparison vs previous month for the same KPIs.
+
+C) CURRENCY INPUT UX AND VALIDATION
+- Fix Daily Figures currency inputs so staff can type values like 9.90 and 19.80 normally (and optionally with a £ prefix) and the field formats to £9.90 after blur.
+- Keep the multiples-of-£9.90 rule for NHS Prepayment and FP57 Refund, but ensure it accepts valid decimal entries.
+- Ensure all Cashing Up fields accept decimal entry and format to £0.00 on blur.
+
+D) DAILY FIGURES CONFIRMATION SUMMARY AND NAV SESSION BUG
+- Confirmation page must show a summary of ALL entries submitted for that day, not partial.
+- Fix the "Back to Dashboard" button so it returns to the dashboard without logging the user out.
+- Ensure session persists across navigation; do not redirect to login unless the session is actually expired.
+
+E) BOOKKEEPING COMPLETE LIST, SAVE/LOCK, AND LAYOUT
+- Ensure the Bookkeeping template includes every heading and task exactly as per this checklist and matches ordering:
+
+Main Wholesalers
+AAH305
+AAH606
+Alliance
+B&S
+Cavendish
+EastStone (Manual)
+Lexon
+MediHealth (Manual)
+Numark
+Numark Benefit
+NWOS Agency
+NWOS Sales
+Phoenix
+Wardles
+
+Sales
+Sales Sheet
+Cashing Up Sheet
+Patient Access
+Dojo
+Pharmoutcomes (MCC)
+Pharmoutcomes (GB)
+Private Clinic Report
+
+Others
+Abbott
+Amazon
+ATLSystems
+Barclay
+BNP Leasing
+Britannia
+Business Waste
+DrugComparison
+EasylogCloud
+EMIS/Optum
+EMT
+GoogleAds
+Microsoft Office
+Octopus
+PharmDel
+PharmSmart
+Sanofi
+Three
+Verisure
+Worldpay
+Xero
+
+MYS & In House
+Mounjaro CSV
+Safety Report
+National Safety Alert
+Meeting Notes
+Signposting Form
+Figures Submission
+NMS
+SSP
+DMS
+Pharmacy First
+Contraceptive
+Unpaid Items
+COVID
+Flu
+Child Flu
+Hypertension Case Finding
+Local services on Figures
+Empty the Stock Drawers
+End of Month Posted?
+Check RECLAIMABLE
+Reconcile credit notes
+SCRIPTLIFE AUDIT AND - Remove Scripts
+Check Spine and Claim
+
+- If the existing spreadsheet parse missed items, update the extraction logic to capture them all.
+- Add an explicit "Save and lock" action for the monthly checklist: ticking boxes should not be final until Save and lock is pressed.
+- After Save and lock, the month becomes read-only for pharmacy users; Head Office can unlock if needed.
+- Fix Bookkeeping UI overflow so it wraps, expands, and never clips content.
+
+F) REPORTS EXPANSION (MORE REPORT TYPES, MULTI-PHARMACY)
+- Redesign Reports landing to have header sections: Figures Report, Cashing Up Report, Audit Report.
+- Under each, provide a dropdown of report types and implement multiple useful report types. Implement at least:
+
+Figures:
+ - Month-to-date summary
+ - Daily breakdown
+ - EPS vs Paper split
+ - Paid vs Exempt split
+ - Services performance (NMS, Pharmacy First, DMS, Hypertension)
+ - Month vs previous month comparison
+
+Cashing Up:
+ - Month-to-date summary
+ - Daily breakdown
+ - VAT category summary
+ - Pay-outs analysis (totals and optionally details)
+ - Days with variance non-zero
+ - Month vs previous month comparison
+
+Audit:
+ - Logins (last N and date-range)
+ - Edits only
+ - Deletions only
+ - Raise a problem tickets
+
+- Add ability to select one pharmacy, multiple pharmacies, or all pharmacies for all reports.
+- Ensure report results are read-only and allow authorised users to drill into audit versions where applicable.
+
+G) DOCUMENTS PER PHARMACY
+- Update Documents so user selects a pharmacy (or uses current pharmacy context) and the app opens the correct SharePoint link.
+- Add Settings fields (Head Office only) to store SharePoint URLs per pharmacy and enforce view/download only.
+
+H) DELETION MASTER PIN BUG AND LOGOUT FIX
+- Fix branch deletion safeguard so the Master PIN 145891 works when entered by Ahmed (ahmed@at-health.co.uk) and requires triple confirmation.
+- User deletion: keep allowed for Head Office Admin and Super Admin, require confirmation, audit it, and send email to info@at-health.co.uk.
+- Fix logout actions:
+  - Log out of User ends staff PIN session and returns to staff picker
+  - Log out of Branch ends email session and returns to email login
+  - For Ahmed, Log out of User should log out Ahmed staff session correctly.
+
+Implement without rewriting the whole app. Keep existing rules (one submission per day, trading day selection, alerts, audit retention).

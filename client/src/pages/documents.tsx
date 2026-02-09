@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { ExternalLink, ShieldCheck } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Card } from "@/components/ui/card";
@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/state/auth";
 
-const sharepointByPharmacy: Record<string, { embed: string; fallback: string }> = {
+const DEFAULT_CONFIG = {
   bowland: {
     embed: "https://www.microsoft.com/en-gb/microsoft-365/sharepoint/collaboration",
     fallback: "https://www.microsoft.com/en-gb/microsoft-365/sharepoint/collaboration",
@@ -31,11 +31,19 @@ const sharepointByPharmacy: Record<string, { embed: string; fallback: string }> 
 export default function Documents() {
   const { session } = useAuth();
   const [fallbackOnly, setFallbackOnly] = useState(false);
+  const [config, setConfig] = useState(DEFAULT_CONFIG);
+
+  useEffect(() => {
+     const saved = localStorage.getItem('sharepoint_config');
+     if (saved) {
+        setConfig(JSON.parse(saved));
+     }
+  }, []);
 
   const scopeKey = session.scope.type === "pharmacy" ? session.scope.pharmacyId : "headoffice";
   const scopeLabel = session.scope.type === "pharmacy" ? session.scope.pharmacyName : "Head Office";
 
-  const cfg = useMemo(() => sharepointByPharmacy[scopeKey], [scopeKey]);
+  const cfg = useMemo(() => config[scopeKey as keyof typeof config] || DEFAULT_CONFIG.headoffice, [config, scopeKey]);
 
   return (
     <AppShell>

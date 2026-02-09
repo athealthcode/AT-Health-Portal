@@ -154,7 +154,7 @@ export function AppShell({ children }: PropsWithChildren) {
                  <button
                     className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-destructive/5 hover:text-destructive transition-colors text-left"
                     data-testid="button-signout-shell"
-                    onClick={signOut}
+                    onClick={() => signOut("branch")}
                  >
                     <LogOut className="h-3.5 w-3.5" />
                     Log out of Branch
@@ -196,7 +196,7 @@ export function AppShell({ children }: PropsWithChildren) {
                              variant="secondary"
                              className="w-full justify-start text-destructive hover:text-destructive"
                              onClick={() => {
-                                signOut();
+                                signOut("branch");
                                 setOpen(false);
                              }}
                           >
@@ -227,7 +227,7 @@ export function AppShell({ children }: PropsWithChildren) {
                  <span className="mx-1">•</span>
                  Trusted Device Active
               </div>
-              <div className="opacity-50">v0.5.1</div>
+              <div className="opacity-50">v0.5.2</div>
             </div>
           </main>
         </div>

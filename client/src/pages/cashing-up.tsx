@@ -15,13 +15,12 @@ import { useSubmittedDays } from "@/hooks/use-submitted-days";
 import { useAuth } from "@/state/auth";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { useLocation } from "wouter";
 
 function normalizeMoney(v: string) {
   if (v === "") return "";
-  const cleaned = v.replace(/[^0-9.-]/g, "");
-  const n = Number.parseFloat(cleaned);
-  if (!Number.isFinite(n)) return "";
-  return Math.round(n * 100) / 100;
+  // Relaxed: just strip illegal, keep dot
+  return v.replace(/[^0-9.]/g, "");
 }
 
 function formatCurrency(v: string | number) {
@@ -31,6 +30,7 @@ function formatCurrency(v: string | number) {
 }
 
 export default function CashingUp() {
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { session } = useAuth();
   const { isSubmitted, markSubmitted } = useSubmittedDays("cashing-up");
@@ -72,16 +72,30 @@ export default function CashingUp() {
   const updateInput = (key: keyof typeof inputs, val: string) => {
     setInputs(prev => ({ ...prev, [key]: normalizeMoney(val) }));
     setHighlightMissing(false);
-    
-    // Check variance if userVariance is entered
-    if (key === "userVariance" || key === "vatStandard" || key === "toBeBanked" /* incomplete dependency list for brevity */) {
-       // We'll check on render or effect, but here works too for immediate feedback
-       setVarianceError(false); 
-    }
+    setVarianceError(false); 
+  };
+
+  const handleBlur = (key: keyof typeof inputs) => {
+     if (inputs[key] !== "") {
+        const num = parseFloat(inputs[key] as string);
+        if (!Number.isNaN(num)) {
+           setInputs(s => ({ ...s, [key]: num.toFixed(2) }));
+        }
+     }
   };
 
   const handlePayoutChange = (id: string, field: "label" | "amount", value: string) => {
      setPayouts(s => s.map(p => p.id === id ? { ...p, [field]: field === "amount" ? normalizeMoney(value) : value } : p));
+  };
+
+  const handlePayoutBlur = (id: string) => {
+     setPayouts(s => s.map(p => {
+        if (p.id === id && p.amount !== "") {
+           const num = parseFloat(p.amount as string);
+           return { ...p, amount: Number.isNaN(num) ? "" : num.toFixed(2) };
+        }
+        return p;
+     }));
   };
 
   const handleSubmit = () => {
@@ -240,7 +254,7 @@ export default function CashingUp() {
               </Card>
 
               <div className="flex gap-4 w-full">
-                 <Button variant="outline" className="flex-1 h-12" onClick={() => window.location.href = "/"}>
+                 <Button variant="outline" className="flex-1 h-12" onClick={() => setLocation("/")}>
                     <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
                  </Button>
                  <Button className="flex-1 h-12" onClick={() => { setView("form"); setLastSubmitted(null); setDate(undefined); }}>
@@ -306,6 +320,7 @@ export default function CashingUp() {
                             className={`pl-6 h-10 font-mono ${highlightMissing && inputs.vatStandard === "" ? "border-destructive ring-destructive/20" : ""}`} 
                             value={inputs.vatStandard} 
                             onChange={e => updateInput("vatStandard", e.target.value)} 
+                            onBlur={() => handleBlur("vatStandard")}
                             placeholder="0.00"
                          />
                       </div>
@@ -318,6 +333,7 @@ export default function CashingUp() {
                             className={`pl-6 h-10 font-mono ${highlightMissing && inputs.vatExempt === "" ? "border-destructive ring-destructive/20" : ""}`} 
                             value={inputs.vatExempt} 
                             onChange={e => updateInput("vatExempt", e.target.value)} 
+                            onBlur={() => handleBlur("vatExempt")}
                             placeholder="0.00"
                          />
                       </div>
@@ -330,6 +346,7 @@ export default function CashingUp() {
                             className={`pl-6 h-10 font-mono ${highlightMissing && inputs.vatZero === "" ? "border-destructive ring-destructive/20" : ""}`} 
                             value={inputs.vatZero} 
                             onChange={e => updateInput("vatZero", e.target.value)} 
+                            onBlur={() => handleBlur("vatZero")}
                             placeholder="0.00"
                          />
                       </div>
@@ -342,6 +359,7 @@ export default function CashingUp() {
                             className={`pl-6 h-10 font-mono ${highlightMissing && inputs.vatLow === "" ? "border-destructive ring-destructive/20" : ""}`} 
                             value={inputs.vatLow} 
                             onChange={e => updateInput("vatLow", e.target.value)} 
+                            onBlur={() => handleBlur("vatLow")}
                             placeholder="0.00"
                          />
                       </div>
@@ -359,6 +377,7 @@ export default function CashingUp() {
                        className={`pl-6 h-11 font-mono ${highlightMissing && inputs.toBeBanked === "" ? "border-destructive ring-destructive/20" : ""}`} 
                        value={inputs.toBeBanked} 
                        onChange={e => updateInput("toBeBanked", e.target.value)} 
+                       onBlur={() => handleBlur("toBeBanked")}
                        placeholder="0.00"
                     />
                  </div>
@@ -372,6 +391,7 @@ export default function CashingUp() {
                        className={`pl-6 h-11 font-mono ${highlightMissing && inputs.readingCard === "" ? "border-destructive ring-destructive/20" : ""}`} 
                        value={inputs.readingCard} 
                        onChange={e => updateInput("readingCard", e.target.value)} 
+                       onBlur={() => handleBlur("readingCard")}
                        placeholder="0.00"
                     />
                  </div>
@@ -393,6 +413,7 @@ export default function CashingUp() {
                             placeholder="0.00" 
                             value={p.amount} 
                             onChange={e => handlePayoutChange(p.id, "amount", e.target.value)} 
+                            onBlur={() => handlePayoutBlur(p.id)}
                             className="pl-6 h-10 font-mono" 
                          />
                       </div>
@@ -413,6 +434,7 @@ export default function CashingUp() {
                        className={`pl-6 h-11 font-mono ${highlightMissing && inputs.userVariance === "" ? "border-destructive ring-destructive/20" : ""}`} 
                        value={inputs.userVariance} 
                        onChange={e => updateInput("userVariance", e.target.value)} 
+                       onBlur={() => handleBlur("userVariance")}
                        placeholder="0.00"
                     />
                  </div>

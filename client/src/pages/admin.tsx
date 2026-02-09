@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth, Role } from "@/state/auth";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Trash2, AlertTriangle, Shield, Clock, Monitor, Info, Lock } from "lucide-react";
+import { Trash2, AlertTriangle, Shield, Clock, Monitor, Info, Lock, Link as LinkIcon, Save } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -22,6 +22,11 @@ type Pharmacy = {
   ipAllowlist: string[];
 };
 
+type SharePointConfig = {
+  embed: string;
+  fallback: string;
+};
+
 export default function Admin() {
   const { toast } = useToast();
   const { users, inviteUser, deleteUser, session, trustedBrowsers, revokeTrustedBrowser } = useAuth();
@@ -29,7 +34,7 @@ export default function Admin() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState<{ type: 'user' | 'pharmacy', id: string } | null>(null);
   const [masterPin, setMasterPin] = useState("");
-  const [deleteStep, setDeleteStep] = useState(0); // 0 = PIN, 1 = Confirm 1, 2 = Confirm 2, 3 = Final
+  const [deleteStep, setDeleteStep] = useState(0); 
 
   // Invite Form State
   const [newEmail, setNewEmail] = useState("");
@@ -49,7 +54,27 @@ export default function Admin() {
     { id: "wilmslow", name: "Wilmslow Pharmacy", openingHours: "Mon–Fri 09:00–18:00; Sat 10:00–14:00", ipAllowlist: ["81.100.12.0/24"] },
   ]);
 
-  // Auto-set scope based on role
+  // SharePoint Settings State
+  const [sharePointConfig, setSharePointConfig] = useState<Record<string, SharePointConfig>>({
+    bowland: { embed: "https://www.microsoft.com/en-gb/microsoft-365/sharepoint/collaboration", fallback: "https://www.microsoft.com/en-gb/microsoft-365/sharepoint/collaboration" },
+    denton: { embed: "https://www.microsoft.com/en-gb/microsoft-365/sharepoint/collaboration", fallback: "https://www.microsoft.com/en-gb/microsoft-365/sharepoint/collaboration" },
+    wilmslow: { embed: "https://www.microsoft.com/en-gb/microsoft-365/sharepoint/collaboration", fallback: "https://www.microsoft.com/en-gb/microsoft-365/sharepoint/collaboration" },
+    headoffice: { embed: "https://www.microsoft.com/en-gb/microsoft-365/sharepoint/collaboration", fallback: "https://www.microsoft.com/en-gb/microsoft-365/sharepoint/collaboration" }
+  });
+
+  // Load Config
+  useEffect(() => {
+    const saved = localStorage.getItem('sharepoint_config');
+    if (saved) {
+       setSharePointConfig(JSON.parse(saved));
+    }
+  }, []);
+
+  const saveSharePointConfig = () => {
+     localStorage.setItem('sharepoint_config', JSON.stringify(sharePointConfig));
+     toast({ title: "Settings Saved", description: "Document links updated successfully." });
+  };
+
   const handleRoleChange = (role: Role) => {
      setNewRole(role);
      if (role === "Head Office Admin" || role === "Finance" || role === "Super Admin") {
@@ -68,10 +93,18 @@ export default function Admin() {
   };
 
   const handleDeleteAttempt = () => {
-     if (masterPin !== "123456") { // Mock Master PIN
+     // REAL logic from requirement: Master PIN only valid for Ahmed
+     // But for dev we simulate the pin check locally
+     if (masterPin !== "145891") {
         toast({ title: "Invalid Master PIN", variant: "destructive" });
         return;
      }
+     
+     if (session.userEmail !== "ahmed@at-health.co.uk") {
+        toast({ title: "Unauthorized", description: "Only Ahmed can authorize this action.", variant: "destructive" });
+        return;
+     }
+
      if (deleteStep < 3) {
         setDeleteStep(s => s + 1);
         return;
@@ -89,7 +122,7 @@ export default function Admin() {
   };
 
   const canManageUsers = session.role === "Head Office Admin" || session.role === "Super Admin";
-  const canDeleteBranch = session.role === "Super Admin"; // Only super admin can delete branch
+  const canDeleteBranch = session.role === "Super Admin"; 
 
   const viewingUser = users.find(u => u.id === viewingUserBrowsers);
   const userTrustedBrowsers = viewingUserBrowsers 
@@ -106,307 +139,366 @@ export default function Admin() {
           </div>
         </div>
         
-        <div className="grid gap-3 lg:grid-cols-2">
-          {/* USERS CARD */}
-          <Card className="rounded-2xl border bg-card/60 p-5 lg:col-span-2" data-testid="card-users">
-            <div className="flex justify-between items-center">
-              <div className="text-sm font-semibold" data-testid="text-users-title">Users & Access</div>
-              
-              <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
-                <DialogTrigger asChild>
-                  <Button size="sm" disabled={!canManageUsers}>+ Invite User</Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Invite New User</DialogTitle>
-                  </DialogHeader>
-                  <div className="grid gap-4 py-4">
-                    <div className="grid gap-2">
-                      <Label>Email</Label>
-                      <Input value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="name@athealth.co.uk" />
-                    </div>
-                    <div className="grid gap-2">
-                      <div className="flex items-center gap-2">
-                         <Label>Role</Label>
-                         <TooltipProvider>
-                           <Tooltip>
-                              <TooltipTrigger><Info className="h-3 w-3 text-muted-foreground" /></TooltipTrigger>
-                              <TooltipContent className="max-w-[300px] text-xs">
-                                 <p><strong>Pharmacy Login:</strong> Daily figures, cashing up, standard reports.</p>
-                                 <p><strong>Pharmacy Manager:</strong> Full branch access + staff management.</p>
-                                 <p><strong>Head Office Admin:</strong> Global view, user management, all reports.</p>
-                                 <p><strong>Finance:</strong> Read-only access to financial reports.</p>
-                              </TooltipContent>
-                           </Tooltip>
-                         </TooltipProvider>
-                      </div>
-                      <Select value={newRole} onValueChange={(v: Role) => handleRoleChange(v)}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Pharmacy Login">Pharmacy Login</SelectItem>
-                          <SelectItem value="Pharmacy Manager">Pharmacy Manager</SelectItem>
-                          <SelectItem value="Head Office Admin">Head Office Admin</SelectItem>
-                          <SelectItem value="Finance">Finance</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="grid gap-2">
-                      <Label>Scope</Label>
-                      <Select value={newScopeType} onValueChange={(v: any) => setNewScopeType(v)} disabled={newRole !== "Pharmacy Login" && newRole !== "Pharmacy Manager"}>
-                         <SelectTrigger><SelectValue /></SelectTrigger>
-                         <SelectContent>
-                            <SelectItem value="pharmacy">Pharmacy</SelectItem>
-                            <SelectItem value="headoffice">Head Office</SelectItem>
-                         </SelectContent>
-                      </Select>
-                    </div>
-                    {newScopeType === "pharmacy" && (
+        <Tabs defaultValue="users" className="w-full">
+           <TabsList className="grid w-full max-w-md grid-cols-3 mb-4">
+              <TabsTrigger value="users">Users</TabsTrigger>
+              <TabsTrigger value="pharmacies">Pharmacies</TabsTrigger>
+              <TabsTrigger value="documents">Documents</TabsTrigger>
+           </TabsList>
+
+           <TabsContent value="users" className="grid gap-3 lg:grid-cols-2">
+             <Card className="rounded-2xl border bg-card/60 p-5 lg:col-span-2" data-testid="card-users">
+               <div className="flex justify-between items-center">
+                 <div className="text-sm font-semibold" data-testid="text-users-title">Users & Access</div>
+                 
+                 <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+                   <DialogTrigger asChild>
+                     <Button size="sm" disabled={!canManageUsers}>+ Invite User</Button>
+                   </DialogTrigger>
+                   <DialogContent>
+                     <DialogHeader>
+                       <DialogTitle>Invite New User</DialogTitle>
+                     </DialogHeader>
+                     <div className="grid gap-4 py-4">
                        <div className="grid gap-2">
-                        <Label>Pharmacy</Label>
-                        <Select value={newPharmacyId} onValueChange={setNewPharmacyId}>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="bowland">Bowland Pharmacy</SelectItem>
-                            <SelectItem value="denton">Denton Pharmacy</SelectItem>
-                            <SelectItem value="wilmslow">Wilmslow Pharmacy</SelectItem>
-                          </SelectContent>
-                        </Select>
+                         <Label>Email</Label>
+                         <Input value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="name@athealth.co.uk" />
                        </div>
-                    )}
-                  </div>
-                  <DialogFooter>
-                    <Button onClick={handleInvite}>Create User</Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            </div>
+                       <div className="grid gap-2">
+                         <div className="flex items-center gap-2">
+                            <Label>Role</Label>
+                            <TooltipProvider>
+                              <Tooltip>
+                                 <TooltipTrigger><Info className="h-3 w-3 text-muted-foreground" /></TooltipTrigger>
+                                 <TooltipContent className="max-w-[300px] text-xs">
+                                    <p><strong>Pharmacy Login:</strong> Daily figures, cashing up, standard reports.</p>
+                                    <p><strong>Pharmacy Manager:</strong> Full branch access + staff management.</p>
+                                    <p><strong>Head Office Admin:</strong> Global view, user management, all reports.</p>
+                                    <p><strong>Finance:</strong> Read-only access to financial reports.</p>
+                                 </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                         </div>
+                         <Select value={newRole} onValueChange={(v: Role) => handleRoleChange(v)}>
+                           <SelectTrigger>
+                             <SelectValue />
+                           </SelectTrigger>
+                           <SelectContent>
+                             <SelectItem value="Pharmacy Login">Pharmacy Login</SelectItem>
+                             <SelectItem value="Pharmacy Manager">Pharmacy Manager</SelectItem>
+                             <SelectItem value="Head Office Admin">Head Office Admin</SelectItem>
+                             <SelectItem value="Finance">Finance</SelectItem>
+                           </SelectContent>
+                         </Select>
+                       </div>
+                       <div className="grid gap-2">
+                         <Label>Scope</Label>
+                         <Select value={newScopeType} onValueChange={(v: any) => setNewScopeType(v)} disabled={newRole !== "Pharmacy Login" && newRole !== "Pharmacy Manager"}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                               <SelectItem value="pharmacy">Pharmacy</SelectItem>
+                               <SelectItem value="headoffice">Head Office</SelectItem>
+                            </SelectContent>
+                         </Select>
+                       </div>
+                       {newScopeType === "pharmacy" && (
+                          <div className="grid gap-2">
+                           <Label>Pharmacy</Label>
+                           <Select value={newPharmacyId} onValueChange={setNewPharmacyId}>
+                             <SelectTrigger><SelectValue /></SelectTrigger>
+                             <SelectContent>
+                               <SelectItem value="bowland">Bowland Pharmacy</SelectItem>
+                               <SelectItem value="denton">Denton Pharmacy</SelectItem>
+                               <SelectItem value="wilmslow">Wilmslow Pharmacy</SelectItem>
+                             </SelectContent>
+                           </Select>
+                          </div>
+                       )}
+                     </div>
+                     <DialogFooter>
+                       <Button onClick={handleInvite}>Create User</Button>
+                     </DialogFooter>
+                   </DialogContent>
+                 </Dialog>
+               </div>
 
-            <div className="mt-3 overflow-hidden rounded-xl border bg-background/40">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Scope</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {users.map((u) => (
-                    <TableRow key={u.id} data-testid={`row-user-${u.id}`}>
-                      <TableCell data-testid={`text-user-email-${u.id}`}>{u.email}</TableCell>
-                      <TableCell data-testid={`text-user-role-${u.id}`}>{u.role}</TableCell>
-                      <TableCell data-testid={`text-user-scope-${u.id}`}>
-                        {u.scope.type === "pharmacy" ? u.scope.pharmacyName : "Head Office"}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          {/* Trusted Browsers View */}
-                          <Button 
-                             size="sm" 
-                             variant="ghost" 
-                             onClick={() => setViewingUserBrowsers(u.id)}
-                             disabled={!canManageUsers}
-                          >
-                             <Shield className="h-4 w-4 text-muted-foreground" />
-                          </Button>
+               <div className="mt-3 overflow-hidden rounded-xl border bg-background/40">
+                 <Table>
+                   <TableHeader>
+                     <TableRow>
+                       <TableHead>Email</TableHead>
+                       <TableHead>Role</TableHead>
+                       <TableHead>Scope</TableHead>
+                       <TableHead className="text-right">Actions</TableHead>
+                     </TableRow>
+                   </TableHeader>
+                   <TableBody>
+                     {users.map((u) => (
+                       <TableRow key={u.id} data-testid={`row-user-${u.id}`}>
+                         <TableCell data-testid={`text-user-email-${u.id}`}>{u.email}</TableCell>
+                         <TableCell data-testid={`text-user-role-${u.id}`}>{u.role}</TableCell>
+                         <TableCell data-testid={`text-user-scope-${u.id}`}>
+                           {u.scope.type === "pharmacy" ? u.scope.pharmacyName : "Head Office"}
+                         </TableCell>
+                         <TableCell className="text-right">
+                           <div className="flex justify-end gap-1">
+                             <Button 
+                                size="sm" 
+                                variant="ghost" 
+                                onClick={() => setViewingUserBrowsers(u.id)}
+                                disabled={!canManageUsers}
+                             >
+                                <Shield className="h-4 w-4 text-muted-foreground" />
+                             </Button>
 
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                            disabled={!canManageUsers}
-                            onClick={() => {
-                               setDeleteConfirmOpen({ type: 'user', id: u.id });
-                               setDeleteStep(0);
-                               setMasterPin("");
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </Card>
+                             <Button
+                               size="sm"
+                               variant="ghost"
+                               className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                               disabled={!canManageUsers}
+                               onClick={() => {
+                                  setDeleteConfirmOpen({ type: 'user', id: u.id });
+                                  setDeleteStep(0);
+                                  setMasterPin("");
+                               }}
+                             >
+                               <Trash2 className="h-4 w-4" />
+                             </Button>
+                           </div>
+                         </TableCell>
+                       </TableRow>
+                     ))}
+                   </TableBody>
+                 </Table>
+               </div>
+             </Card>
 
-          {/* MASTER PIN DELETE DIALOG */}
-          <Dialog open={!!deleteConfirmOpen} onOpenChange={(o) => !o && setDeleteConfirmOpen(null)}>
-             <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                   <DialogTitle className="flex items-center gap-2 text-destructive">
-                      <AlertTriangle className="h-5 w-5" />
-                      {deleteStep === 0 ? "Confirm Deletion" : "ARE YOU SURE?"}
-                   </DialogTitle>
-                   <DialogDescription>
-                      This action is permanent and will be audit logged.
-                   </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                   <div className="grid gap-2">
-                      <Label>Enter Master PIN to continue</Label>
-                      <Input 
-                         type="password" 
-                         value={masterPin} 
-                         onChange={e => setMasterPin(e.target.value)} 
-                         placeholder="******" 
-                         className="font-mono tracking-widest"
-                      />
+             <Card className="rounded-2xl border bg-card/60 p-5 lg:col-span-2" data-testid="card-audit">
+               <div className="flex items-center justify-between mb-4">
+                  <div className="text-sm font-semibold" data-testid="text-audit-title">Audit Logs</div>
+                  <Select value={auditFilter} onValueChange={(v: any) => setAuditFilter(v)}>
+                     <SelectTrigger className="w-[140px] h-8 text-xs">
+                        <SelectValue />
+                     </SelectTrigger>
+                     <SelectContent>
+                        <SelectItem value="all">All Events</SelectItem>
+                        <SelectItem value="pharmacy">Pharmacy Only</SelectItem>
+                        <SelectItem value="headoffice">Head Office Only</SelectItem>
+                     </SelectContent>
+                  </Select>
+               </div>
+               
+               <div className="overflow-hidden rounded-xl border bg-background/40">
+                 <Table>
+                   <TableHeader>
+                     <TableRow>
+                       <TableHead>Time</TableHead>
+                       <TableHead>Actor</TableHead>
+                       <TableHead>Action</TableHead>
+                     </TableRow>
+                   </TableHeader>
+                   <TableBody>
+                     {[
+                        { time: "10:42", actor: "Sarah Ahmed", action: "Submitted Daily Figures", scope: "pharmacy" },
+                        { time: "10:15", actor: "Helen Carter", action: "User Invited", scope: "headoffice" },
+                        { time: "09:30", actor: "System", action: "Report Generated", scope: "headoffice" },
+                        { time: "Yesterday", actor: "James Wilson", action: "Cashing Up", scope: "pharmacy" },
+                     ]
+                     .filter(l => auditFilter === "all" || l.scope === auditFilter)
+                     .map((log, i) => (
+                        <TableRow key={i}>
+                           <TableCell className="py-2 text-xs">{log.time}</TableCell>
+                           <TableCell className="py-2 text-xs font-medium">{log.actor}</TableCell>
+                           <TableCell className="py-2 text-xs text-muted-foreground">{log.action}</TableCell>
+                        </TableRow>
+                     ))}
+                   </TableBody>
+                 </Table>
+               </div>
+             </Card>
+           </TabsContent>
+
+           <TabsContent value="pharmacies">
+             <Card className="rounded-2xl border bg-card/60 p-5" data-testid="card-pharmacies">
+               <div className="text-sm font-semibold" data-testid="text-pharmacies-title">Pharmacies & IP Security</div>
+               <div className="mt-3 grid gap-3">
+                 {pharmacies.map((p) => (
+                   <div key={p.id} className="rounded-xl border bg-background/40 p-4 relative group" data-testid={`card-pharmacy-${p.id}`}>
+                     <div className="flex items-start justify-between gap-3">
+                       <div>
+                         <div className="font-medium" data-testid={`text-pharmacy-name-${p.id}`}>{p.name}</div>
+                         <div className="text-xs text-muted-foreground" data-testid={`text-pharmacy-hours-${p.id}`}>{p.openingHours}</div>
+                       </div>
+                       <Badge variant="secondary" className="pill" data-testid={`badge-pharmacy-${p.id}`}>Active</Badge>
+                     </div>
+                     <Separator className="my-3" />
+                     <div className="text-xs font-semibold text-muted-foreground" data-testid={`text-allowlist-${p.id}`}>Allowlisted Subnets</div>
+                     <div className="mt-2 flex flex-wrap gap-2">
+                       {p.ipAllowlist.map((cidr, idx) => (
+                         <Badge key={idx} variant="outline" className="pill" data-testid={`badge-ip-${p.id}-${idx}`}>{cidr}</Badge>
+                       ))}
+                     </div>
+
+                     {canDeleteBranch && (
+                        <Button 
+                           variant="ghost" 
+                           size="icon" 
+                           className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:bg-destructive/10"
+                           onClick={() => {
+                              setDeleteConfirmOpen({ type: 'pharmacy', id: p.id });
+                              setDeleteStep(0);
+                              setMasterPin("");
+                           }}
+                        >
+                           <Trash2 className="h-4 w-4" />
+                        </Button>
+                     )}
                    </div>
-                   {deleteStep > 0 && (
-                      <div className="text-sm font-bold text-destructive text-center p-2 bg-destructive/10 rounded">
-                         CONFIRMATION STEP {deleteStep}/3
-                      </div>
+                 ))}
+               </div>
+             </Card>
+           </TabsContent>
+
+           <TabsContent value="documents">
+             <Card className="rounded-2xl border bg-card/60 p-5">
+                <div className="flex justify-between items-center mb-4">
+                   <div>
+                      <div className="text-sm font-semibold">SharePoint Configuration</div>
+                      <div className="text-xs text-muted-foreground">Manage embedded document links per branch.</div>
+                   </div>
+                   {canManageUsers && (
+                      <Button size="sm" onClick={saveSharePointConfig}>
+                         <Save className="h-4 w-4 mr-2" /> Save Changes
+                      </Button>
                    )}
                 </div>
-                <DialogFooter>
-                   <Button variant="ghost" onClick={() => setDeleteConfirmOpen(null)}>Cancel</Button>
-                   <Button variant="destructive" onClick={handleDeleteAttempt}>
-                      {deleteStep < 3 ? "Confirm & Continue" : "DELETE PERMANENTLY"}
-                   </Button>
-                </DialogFooter>
-             </DialogContent>
-          </Dialog>
 
-          {/* Trusted Devices Dialog */}
-          <Dialog open={!!viewingUserBrowsers} onOpenChange={(o) => !o && setViewingUserBrowsers(null)}>
-            <DialogContent>
-               <DialogHeader>
-                  <DialogTitle>Trusted Devices: {viewingUser?.email}</DialogTitle>
-               </DialogHeader>
-               <div className="py-4">
-                  {userTrustedBrowsers.length === 0 ? (
-                     <div className="text-sm text-muted-foreground">No active trusted devices.</div>
-                  ) : (
-                     <div className="grid gap-3">
-                        {userTrustedBrowsers.map(tb => (
-                           <div key={tb.id} className="flex items-start justify-between rounded-lg border p-3 text-sm">
-                              <div>
-                                 <div className="flex items-center gap-2 font-medium">
-                                    <Monitor className="h-4 w-4" />
-                                    {tb.ipAddress}
-                                 </div>
-                                 <div className="text-xs text-muted-foreground mt-1">
-                                    Last used: {new Date(tb.lastUsedAt).toLocaleDateString()}
-                                 </div>
-                                 <div className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                                    <Clock className="h-3 w-3" />
-                                    Expires: {new Date(tb.expiresAt).toLocaleDateString()}
-                                 </div>
-                              </div>
-                              <Button 
-                                 size="sm" 
-                                 variant="outline" 
-                                 className="text-destructive hover:bg-destructive/10"
-                                 onClick={() => {
-                                    revokeTrustedBrowser(tb.id);
-                                    toast({ title: "Device Revoked", description: "User will be prompted for OTP on next login." });
-                                 }}
-                              >
-                                 Revoke
-                              </Button>
-                           </div>
-                        ))}
-                     </div>
-                  )}
-               </div>
-            </DialogContent>
-          </Dialog>
-
-          {/* PHARMACIES CARD */}
-          <Card className="rounded-2xl border bg-card/60 p-5" data-testid="card-pharmacies">
-            <div className="text-sm font-semibold" data-testid="text-pharmacies-title">Pharmacies & IP Security</div>
-            <div className="mt-3 grid gap-3">
-              {pharmacies.map((p) => (
-                <div key={p.id} className="rounded-xl border bg-background/40 p-4 relative group" data-testid={`card-pharmacy-${p.id}`}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="font-medium" data-testid={`text-pharmacy-name-${p.id}`}>{p.name}</div>
-                      <div className="text-xs text-muted-foreground" data-testid={`text-pharmacy-hours-${p.id}`}>{p.openingHours}</div>
-                    </div>
-                    <Badge variant="secondary" className="pill" data-testid={`badge-pharmacy-${p.id}`}>Active</Badge>
-                  </div>
-                  <Separator className="my-3" />
-                  <div className="text-xs font-semibold text-muted-foreground" data-testid={`text-allowlist-${p.id}`}>Allowlisted Subnets</div>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {p.ipAllowlist.map((cidr, idx) => (
-                      <Badge key={idx} variant="outline" className="pill" data-testid={`badge-ip-${p.id}-${idx}`}>{cidr}</Badge>
-                    ))}
-                  </div>
-
-                  {canDeleteBranch && (
-                     <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:bg-destructive/10"
-                        onClick={() => {
-                           setDeleteConfirmOpen({ type: 'pharmacy', id: p.id });
-                           setDeleteStep(0);
-                           setMasterPin("");
-                        }}
-                     >
-                        <Trash2 className="h-4 w-4" />
-                     </Button>
-                  )}
+                <div className="space-y-6">
+                   {pharmacies.concat([{ id: "headoffice", name: "Head Office", openingHours: "", ipAllowlist: [] }]).map((p) => (
+                      <div key={p.id} className="rounded-xl border bg-background/40 p-4">
+                         <div className="flex items-center gap-2 mb-3">
+                            <Badge variant="outline">{p.name}</Badge>
+                         </div>
+                         <div className="grid gap-4 md:grid-cols-2">
+                            <div>
+                               <Label className="text-xs">Embed URL</Label>
+                               <div className="flex gap-2 mt-1.5">
+                                 <Input 
+                                    value={sharePointConfig[p.id]?.embed || ""} 
+                                    onChange={(e) => setSharePointConfig(s => ({ ...s, [p.id]: { ...s[p.id], embed: e.target.value } }))}
+                                    className="font-mono text-xs"
+                                    disabled={!canManageUsers}
+                                 />
+                               </div>
+                            </div>
+                            <div>
+                               <Label className="text-xs">Fallback Link</Label>
+                               <div className="flex gap-2 mt-1.5">
+                                 <Input 
+                                    value={sharePointConfig[p.id]?.fallback || ""} 
+                                    onChange={(e) => setSharePointConfig(s => ({ ...s, [p.id]: { ...s[p.id], fallback: e.target.value } }))}
+                                    className="font-mono text-xs"
+                                    disabled={!canManageUsers}
+                                 />
+                                 <Button 
+                                    size="icon" 
+                                    variant="outline"
+                                    onClick={() => window.open(sharePointConfig[p.id]?.fallback, '_blank')}
+                                 >
+                                    <LinkIcon className="h-4 w-4" />
+                                 </Button>
+                               </div>
+                            </div>
+                         </div>
+                      </div>
+                   ))}
                 </div>
-              ))}
-            </div>
-          </Card>
+             </Card>
+           </TabsContent>
+        </Tabs>
 
-          {/* AUDIT LOGS CARD */}
-          <Card className="rounded-2xl border bg-card/60 p-5" data-testid="card-audit">
-            <div className="flex items-center justify-between mb-4">
-               <div className="text-sm font-semibold" data-testid="text-audit-title">Audit Logs</div>
-               <Select value={auditFilter} onValueChange={(v: any) => setAuditFilter(v)}>
-                  <SelectTrigger className="w-[140px] h-8 text-xs">
-                     <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                     <SelectItem value="all">All Events</SelectItem>
-                     <SelectItem value="pharmacy">Pharmacy Only</SelectItem>
-                     <SelectItem value="headoffice">Head Office Only</SelectItem>
-                  </SelectContent>
-               </Select>
-            </div>
-            
-            <div className="overflow-hidden rounded-xl border bg-background/40">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Time</TableHead>
-                    <TableHead>Actor</TableHead>
-                    <TableHead>Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {[
-                     { time: "10:42", actor: "Sarah Ahmed", action: "Submitted Daily Figures", scope: "pharmacy" },
-                     { time: "10:15", actor: "Helen Carter", action: "User Invited", scope: "headoffice" },
-                     { time: "09:30", actor: "System", action: "Report Generated", scope: "headoffice" },
-                     { time: "Yesterday", actor: "James Wilson", action: "Cashing Up", scope: "pharmacy" },
-                  ]
-                  .filter(l => auditFilter === "all" || l.scope === auditFilter)
-                  .map((log, i) => (
-                     <TableRow key={i}>
-                        <TableCell className="py-2 text-xs">{log.time}</TableCell>
-                        <TableCell className="py-2 text-xs font-medium">{log.actor}</TableCell>
-                        <TableCell className="py-2 text-xs text-muted-foreground">{log.action}</TableCell>
-                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-            <div className="mt-3 text-[10px] text-muted-foreground text-center">
-               Logs are retained indefinitely.
-            </div>
-          </Card>
+        {/* MASTER PIN DELETE DIALOG */}
+        <Dialog open={!!deleteConfirmOpen} onOpenChange={(o) => !o && setDeleteConfirmOpen(null)}>
+           <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                 <DialogTitle className="flex items-center gap-2 text-destructive">
+                    <AlertTriangle className="h-5 w-5" />
+                    {deleteStep === 0 ? "Confirm Deletion" : "ARE YOU SURE?"}
+                 </DialogTitle>
+                 <DialogDescription>
+                    This action is permanent and will be audit logged.
+                 </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                 <div className="grid gap-2">
+                    <Label>Enter Master PIN to continue</Label>
+                    <Input 
+                       type="password" 
+                       value={masterPin} 
+                       onChange={e => setMasterPin(e.target.value)} 
+                       placeholder="******" 
+                       className="font-mono tracking-widest"
+                    />
+                 </div>
+                 {deleteStep > 0 && (
+                    <div className="text-sm font-bold text-destructive text-center p-2 bg-destructive/10 rounded">
+                       CONFIRMATION STEP {deleteStep}/3
+                    </div>
+                 )}
+              </div>
+              <DialogFooter>
+                 <Button variant="ghost" onClick={() => setDeleteConfirmOpen(null)}>Cancel</Button>
+                 <Button variant="destructive" onClick={handleDeleteAttempt}>
+                    {deleteStep < 3 ? "Confirm & Continue" : "DELETE PERMANENTLY"}
+                 </Button>
+              </DialogFooter>
+           </DialogContent>
+        </Dialog>
 
-        </div>
+        {/* Trusted Devices Dialog */}
+        <Dialog open={!!viewingUserBrowsers} onOpenChange={(o) => !o && setViewingUserBrowsers(null)}>
+          <DialogContent>
+             <DialogHeader>
+                <DialogTitle>Trusted Devices: {viewingUser?.email}</DialogTitle>
+             </DialogHeader>
+             <div className="py-4">
+                {userTrustedBrowsers.length === 0 ? (
+                   <div className="text-sm text-muted-foreground">No active trusted devices.</div>
+                ) : (
+                   <div className="grid gap-3">
+                      {userTrustedBrowsers.map(tb => (
+                         <div key={tb.id} className="flex items-start justify-between rounded-lg border p-3 text-sm">
+                            <div>
+                               <div className="flex items-center gap-2 font-medium">
+                                  <Monitor className="h-4 w-4" />
+                                  {tb.ipAddress}
+                               </div>
+                               <div className="text-xs text-muted-foreground mt-1">
+                                  Last used: {new Date(tb.lastUsedAt).toLocaleDateString()}
+                               </div>
+                               <div className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                                  <Clock className="h-3 w-3" />
+                                  Expires: {new Date(tb.expiresAt).toLocaleDateString()}
+                               </div>
+                            </div>
+                            <Button 
+                               size="sm" 
+                               variant="outline" 
+                               className="text-destructive hover:bg-destructive/10"
+                               onClick={() => {
+                                  revokeTrustedBrowser(tb.id);
+                                  toast({ title: "Device Revoked", description: "User will be prompted for OTP on next login." });
+                               }}
+                            >
+                               Revoke
+                            </Button>
+                         </div>
+                      ))}
+                   </div>
+                )}
+             </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </AppShell>
   );

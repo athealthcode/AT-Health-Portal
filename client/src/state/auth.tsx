@@ -69,7 +69,7 @@ type SignInResult = {
 type AuthContextValue = {
   session: SessionState;
   signIn: (input: SignInInput) => Promise<SignInResult>; 
-  signOut: () => void;
+  signOut: (type?: "user" | "branch") => void; // Updated signature
   selectStaff: (staffId: string) => void;
   verifyStaffPin: (
     pin: string,
@@ -97,7 +97,14 @@ const INITIAL_USERS: UserAccount[] = [
   { 
     id: "u1", 
     email: "info@at-health.co.uk", 
-    role: "Super Admin", 
+    role: "Head Office Admin", // Changed from Super Admin
+    scope: { type: "headoffice" },
+    status: "active"
+  },
+  { 
+    id: "u_ahmed", 
+    email: "ahmed@at-health.co.uk", 
+    role: "Super Admin", // The only Master
     scope: { type: "headoffice" },
     status: "active"
   },
@@ -149,8 +156,9 @@ const MOCK_STAFF_BY_SCOPE: Record<string, StaffIdentity[]> = {
     { id: "w2", name: "Wendy Wilmslow", role: "Pharmacy Login" },
   ],
   headoffice: [
-    { id: "h1", name: "Master User", role: "Super Admin" },
-    { id: "h2", name: "Finance User", role: "Finance" },
+    { id: "h1", name: "Ahmed", role: "Super Admin" },
+    { id: "h2", name: "Sarah (Admin)", role: "Head Office Admin" },
+    { id: "h3", name: "Mike (Finance)", role: "Finance" },
   ]
 };
 
@@ -184,20 +192,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSession(s => ({ ...s, currentIp }));
   }, [currentIp]);
 
-  const signOut = useCallback(() => {
-    setSession({
-      isAuthenticated: false,
-      staffPinVerified: false,
-      userEmail: undefined,
-      role: undefined,
-      staff: undefined,
-      scope: { type: "pharmacy", pharmacyId: "bowland", pharmacyName: "Bowland Pharmacy" },
-      pinAttemptsLeft: 3,
-      pinLockoutUntil: null,
-      currentIp,
-    });
-    setSelectedStaffId(null);
-    setCurrentOtp(null);
+  const signOut = useCallback((type: "user" | "branch" = "branch") => {
+    if (type === "user") {
+        // Just clear staff session, keep email session
+        setSession(s => ({
+            ...s,
+            staffPinVerified: false,
+            staff: undefined,
+            pinAttemptsLeft: 3,
+            pinLockoutUntil: null,
+        }));
+        setSelectedStaffId(null);
+    } else {
+        // Full logout
+        setSession({
+            isAuthenticated: false,
+            staffPinVerified: false,
+            userEmail: undefined,
+            role: undefined,
+            staff: undefined,
+            scope: { type: "pharmacy", pharmacyId: "bowland", pharmacyName: "Bowland Pharmacy" },
+            pinAttemptsLeft: 3,
+            pinLockoutUntil: null,
+            currentIp,
+        });
+        setSelectedStaffId(null);
+        setCurrentOtp(null);
+    }
   }, [currentIp]);
 
   const inviteUser = useCallback((email: string, role: Role, scopeType: "headoffice" | "pharmacy", pharmacyId?: string) => {
@@ -332,6 +353,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const availableStaff = useMemo(() => {
     if (!session.scope) return [];
     const key = session.scope.type === "pharmacy" ? session.scope.pharmacyId : "headoffice";
+    
+    // Filter staff list based on who is logged in via email (if needed)
+    // For now, headoffice sees Ahmed, Sarah, Mike.
+    // If logged in as ahmed@, he should probably only pick Ahmed or just auto-select? 
+    // Requirement says: "Rename Master staff identity to Ahmed... Master PIN 145891 can only be used when email session user is ahmed@..."
+    // So 'Ahmed' staff should exist in MOCK_STAFF_BY_SCOPE for headoffice.
+    
     return MOCK_STAFF_BY_SCOPE[key] || [];
   }, [session.scope]);
 
@@ -352,8 +380,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { ok: false as const, attemptsLeft: session.pinAttemptsLeft, lockedOut: true };
     }
 
-    const isMaster = pin === MASTER_PIN;
-    const isCorrect = pin === STAFF_PIN || isMaster;
+    // CHECK MASTER PIN OWNERSHIP
+    const isMasterPin = pin === MASTER_PIN;
+    let isCorrect = pin === STAFF_PIN; // Default correct
+
+    if (isMasterPin) {
+       // Only allowed if email is ahmed@at-health.co.uk
+       if (session.userEmail?.toLowerCase() === "ahmed@at-health.co.uk") {
+          isCorrect = true;
+       } else {
+          isCorrect = false; // Other users cannot use Master PIN
+       }
+    }
 
     if (!isCorrect) {
       const nextAttempts = Math.max(0, session.pinAttemptsLeft - 1);
@@ -381,7 +419,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }));
 
     return { ok: true as const, staff: staffUser };
-  }, [session.pinAttemptsLeft, session.pinLockoutUntil, availableStaff, selectedStaffId]);
+  }, [session.pinAttemptsLeft, session.pinLockoutUntil, session.userEmail, availableStaff, selectedStaffId]);
 
   const value = useMemo<AuthContextValue>(
     () => ({ 
