@@ -10,6 +10,7 @@ import Pin from "@/pages/pin";
 import Dashboard from "./pages/dashboard";
 import DailyFigures from "./pages/daily-figures";
 import CashingUp from "./pages/cashing-up";
+import Bookkeeping from "./pages/bookkeeping";
 import Reports from "./pages/reports";
 import Documents from "./pages/documents";
 import Admin from "./pages/admin";
@@ -38,6 +39,7 @@ function Router() {
       <GuardedRoute path="/" component={Dashboard} />
       <GuardedRoute path="/daily-figures" component={DailyFigures} />
       <GuardedRoute path="/cashing-up" component={CashingUp} />
+      <GuardedRoute path="/bookkeeping" component={Bookkeeping} />
       <GuardedRoute path="/reports" component={Reports} />
       <GuardedRoute path="/documents" component={Documents} />
       <GuardedRoute path="/admin" component={Admin} />

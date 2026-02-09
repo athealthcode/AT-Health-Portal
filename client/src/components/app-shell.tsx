@@ -6,10 +6,11 @@ import {
   Coins,
   BarChart3,
   Files,
-  Shield,
+  Settings,
   LogOut,
   Building2,
   ChevronDown,
+  BookOpen,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -29,7 +30,7 @@ type NavItem = {
 
 export function AppShell({ children }: PropsWithChildren) {
   const [location] = useLocation();
-  const { session, signOut } = useAuth();
+  const { session, signOut, selectStaff } = useAuth();
   const [open, setOpen] = useState(false);
 
   const navItems: NavItem[] = useMemo(
@@ -37,6 +38,12 @@ export function AppShell({ children }: PropsWithChildren) {
       { href: "/", label: "Dashboard", icon: LayoutDashboard, testId: "link-nav-dashboard" },
       { href: "/daily-figures", label: "Daily Figures", icon: FileText, testId: "link-nav-daily-figures" },
       { href: "/cashing-up", label: "Cashing Up", icon: Coins, testId: "link-nav-cashing-up" },
+      { 
+         href: "/bookkeeping", 
+         label: "Bookkeeping", 
+         icon: BookOpen, 
+         testId: "link-nav-bookkeeping" 
+      },
       {
         href: "/reports",
         label: "Reports",
@@ -52,8 +59,8 @@ export function AppShell({ children }: PropsWithChildren) {
       },
       {
         href: "/admin",
-        label: "Admin",
-        icon: Shield,
+        label: "Settings",
+        icon: Settings,
         testId: "link-nav-admin",
         requiresRole: (r) => r === "Head Office Admin" || r === "Super Admin",
       },
@@ -79,13 +86,15 @@ export function AppShell({ children }: PropsWithChildren) {
       </div>
 
       <div className="flex items-center gap-2">
-        <Badge variant="secondary" className="pill" data-testid="badge-role">
+        <Badge variant="secondary" className="pill bg-background/50" data-testid="badge-role">
           <Building2 className="h-3.5 w-3.5 mr-1.5" />
           {session.role ?? "—"}
         </Badge>
-        <Badge variant="outline" className="pill" data-testid="badge-staff">
-          {session.staff ? session.staff.name : "Staff: not set"}
-        </Badge>
+        {session.staff && (
+           <Badge variant="outline" className="pill bg-background/50" data-testid="badge-staff">
+              {session.staff.name}
+           </Badge>
+        )}
       </div>
     </div>
   );
@@ -102,18 +111,18 @@ export function AppShell({ children }: PropsWithChildren) {
               href={item.href}
               onClick={() => setOpen(false)}
               className={cn(
-                "group flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition",
-                "hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
-                active ? "bg-sidebar-accent text-sidebar-foreground" : "text-sidebar-foreground/80",
+                "group flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition font-medium",
+                "hover:bg-primary/10 hover:text-primary",
+                active ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground",
               )}
               data-testid={item.testId}
             >
               <Icon className={cn("h-4 w-4", active ? "opacity-100" : "opacity-70 group-hover:opacity-100")} />
-              <span className="font-medium">{item.label}</span>
-              {active ? (
+              <span>{item.label}</span>
+              {active && !compact ? (
                 <motion.span
                   layoutId="nav-active"
-                  className="ml-auto h-2 w-2 rounded-full bg-sidebar-primary"
+                  className="ml-auto h-2 w-2 rounded-full bg-white/20"
                 />
               ) : null}
             </Link>
@@ -128,23 +137,31 @@ export function AppShell({ children }: PropsWithChildren) {
       <div className="noise-overlay" />
 
       <div className="mx-auto max-w-7xl px-4 py-5 md:px-6 md:py-8">
-        <div className="grid gap-5 lg:grid-cols-[300px_1fr]">
+        <div className="grid gap-5 lg:grid-cols-[280px_1fr]">
           <aside className="hidden lg:block">
-            <div className="surface rounded-2xl p-4">
+            <div className="surface rounded-2xl p-4 sticky top-6">
               {header}
               <Separator className="my-4" />
               <NavLinks />
               <Separator className="my-4" />
-              <div className="flex items-center justify-between text-xs text-sidebar-foreground/70">
-                <div data-testid="text-security-chip">Trusted device • IP allowlist • MFA</div>
-                <button
-                  className="inline-flex items-center gap-1 text-sidebar-foreground/80 hover:text-sidebar-foreground transition"
-                  data-testid="button-signout-shell"
-                  onClick={signOut}
-                >
-                  <LogOut className="h-3.5 w-3.5" />
-                  Sign out
-                </button>
+              <div className="space-y-1">
+                 {session.staff && (
+                    <button
+                       className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-destructive/5 hover:text-destructive transition-colors text-left"
+                       onClick={() => selectStaff(null as any)}
+                    >
+                       <LogOut className="h-3.5 w-3.5" />
+                       Log out of {session.staff.name.split(' ')[0]}
+                    </button>
+                 )}
+                 <button
+                    className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-destructive/5 hover:text-destructive transition-colors text-left"
+                    data-testid="button-signout-shell"
+                    onClick={signOut}
+                 >
+                    <LogOut className="h-3.5 w-3.5" />
+                    Log out of Branch
+                 </button>
               </div>
             </div>
           </aside>
@@ -159,21 +176,36 @@ export function AppShell({ children }: PropsWithChildren) {
                       Menu <ChevronDown className="h-4 w-4 ml-1" />
                     </Button>
                   </SheetTrigger>
-                  <SheetContent side="right" className="w-[340px] bg-sidebar text-sidebar-foreground">
-                    <div className="pt-3">
+                  <SheetContent side="right" className="w-[300px]">
+                    <div className="pt-6">
                       <NavLinks compact />
-                      <Separator className="my-4 bg-sidebar-border" />
-                      <Button
-                        variant="secondary"
-                        className="w-full"
-                        data-testid="button-signout-mobile"
-                        onClick={() => {
-                          signOut();
-                          setOpen(false);
-                        }}
-                      >
-                        <LogOut className="h-4 w-4 mr-2" /> Sign out
-                      </Button>
+                      <Separator className="my-4" />
+                      <div className="space-y-2">
+                          {session.staff && (
+                             <Button
+                                variant="ghost"
+                                className="w-full justify-start text-muted-foreground"
+                                onClick={() => {
+                                   selectStaff(null as any);
+                                   setOpen(false);
+                                }}
+                             >
+                                <LogOut className="h-4 w-4 mr-2" /> 
+                                Log out User
+                             </Button>
+                          )}
+                          <Button
+                             variant="secondary"
+                             className="w-full justify-start text-destructive hover:text-destructive"
+                             onClick={() => {
+                                signOut();
+                                setOpen(false);
+                             }}
+                          >
+                             <LogOut className="h-4 w-4 mr-2" /> 
+                             Log out Branch
+                          </Button>
+                      </div>
                     </div>
                   </SheetContent>
                 </Sheet>
@@ -186,18 +218,18 @@ export function AppShell({ children }: PropsWithChildren) {
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35, ease: [0.2, 0.8, 0.2, 1] }}
-              className="surface rounded-2xl p-5 md:p-7"
+              className="surface rounded-2xl p-5 md:p-7 min-h-[calc(100vh-100px)]"
             >
               {children}
             </motion.div>
 
-            <div className="mt-3 text-xs text-muted-foreground" data-testid="text-footer">
-              Actions are attributed to: <span className="font-medium">{session.staff?.name ?? "—"}</span>
-              {session.staff?.role ? (
-                <span className=""> ({session.staff.role})</span>
-              ) : null}
-              <span className=""> • </span>
-              {session.scope.type === "pharmacy" ? session.scope.pharmacyName : "Head Office"}
+            <div className="mt-3 text-xs text-muted-foreground flex justify-between px-2" data-testid="text-footer">
+              <div>
+                 {session.scope.type === "pharmacy" ? session.scope.pharmacyName : "Head Office"}
+                 <span className="mx-1">•</span>
+                 Trusted Device Active
+              </div>
+              <div className="opacity-50">v0.5.0</div>
             </div>
           </main>
         </div>
