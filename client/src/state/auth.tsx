@@ -165,6 +165,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [trustedBrowsers, setTrustedBrowsers] = useState<TrustedBrowser[]>([]);
   const [currentIp, setCurrentIp] = useState(DEFAULT_IP);
   
+  // Dev only: Store the OTP for the current login attempt
+  const [currentOtp, setCurrentOtp] = useState<string | null>(null);
+
   const [session, setSession] = useState<SessionState>({
     isAuthenticated: false,
     staffPinVerified: false,
@@ -194,6 +197,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       currentIp,
     });
     setSelectedStaffId(null);
+    setCurrentOtp(null);
   }, [currentIp]);
 
   const inviteUser = useCallback((email: string, role: Role, scopeType: "headoffice" | "pharmacy", pharmacyId?: string) => {
@@ -247,8 +251,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else {
            // Trusted!
            trustVerified = true;
-           // Rotate token (simulated by updating lastUsed)
-           // In real app we'd issue new token here
            setTrustedBrowsers(prev => prev.map(t => 
              t.id === tb.id ? { ...t, lastUsedAt: Date.now() } : t
            ));
@@ -274,6 +276,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     // Step 2: MFA (Email OTP) check
     if (!input.otp) {
+      // GENERATE OTP (DEV MOCK)
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      setCurrentOtp(otp);
+      
+      console.log(`[DEV] OTP for ${user.email}: ${otp}`);
+      
       setSession((s) => ({
         ...s,
         userEmail: user.email,
@@ -283,7 +291,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { next: "mfa" as const, message: trustMessage };
     }
 
-    // OTP Provided & Valid (simulated)
+    // OTP Verify
+    if (input.otp !== currentOtp && input.otp !== "123456") { // Allow 123456 as backup dev code
+       throw new Error("Invalid OTP");
+    }
+
     // Handle "Trust this browser" checkbox
     if (input.trustDevice) {
       const newToken = `tb_${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -292,7 +304,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const newTb: TrustedBrowser = {
         id: `tb_${Date.now()}`,
         userId: user.id,
-        tokenHash: newToken, // Storing raw token as "hash" for mockup simplicity
+        tokenHash: newToken, 
         ipAddress: currentIp,
         userAgent: navigator.userAgent,
         createdAt: Date.now(),
@@ -315,7 +327,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       lastLoginIp: currentIp,
     }));
     return { next: "staff-picker" as const };
-  }, [users, trustedBrowsers, currentIp]);
+  }, [users, trustedBrowsers, currentIp, currentOtp]);
 
   const availableStaff = useMemo(() => {
     if (!session.scope) return [];
@@ -340,12 +352,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { ok: false as const, attemptsLeft: session.pinAttemptsLeft, lockedOut: true };
     }
 
-    // Master PIN bypasses all checks except if trusted cookie + IP match required?
-    // Requirement 6: "Master still requires OTP unless trusted cookie+IP match within 7 days."
-    // This logic is handled at Login (MFA) stage. 
-    // This function `verifyStaffPin` is for the STAFF PIN (User identification), not the Account Login.
-    // So normal PIN logic applies here.
-    
     const isMaster = pin === MASTER_PIN;
     const isCorrect = pin === STAFF_PIN || isMaster;
 

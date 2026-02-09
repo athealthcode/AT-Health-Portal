@@ -19,7 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/state/auth";
-import logo from "@/assets/logo.png";
+import logo from "@/assets/at-health-logo.png";
 
 type NavItem = {
   href: string;

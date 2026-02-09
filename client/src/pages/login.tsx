@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/state/auth";
 import { Network, ArrowRight, Mail } from "lucide-react";
-import atLogo from "@/assets/logo.png";
+import atLogo from "@/assets/at-health-logo.png";
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -51,7 +51,7 @@ export default function Login() {
         className="w-full max-w-md z-10"
       >
         <div className="flex flex-col items-center mb-8">
-          <div className="w-20 h-20 mb-4 bg-white rounded-2xl shadow-sm p-3 flex items-center justify-center">
+          <div className="w-24 h-24 mb-4 bg-white/90 backdrop-blur rounded-2xl shadow-sm p-4 flex items-center justify-center">
             <img src={atLogo} alt="AT Health Logo" className="w-full h-full object-contain" />
           </div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">AT Health Portal</h1>
@@ -108,7 +108,7 @@ export default function Login() {
                       const res = await signIn({ email, password });
                       if (res.next === "mfa") {
                         setStep("mfa");
-                        toast({ title: "OTP Sent", description: "Check your email for the code." });
+                        toast({ title: "OTP Sent", description: "Check your email (or console in dev)." });
                         if (res.message) setNetworkMessage(res.message);
                       }
                     } catch (e) {
@@ -178,6 +178,8 @@ export default function Login() {
                       try {
                         const res = await signIn({ email, password, otp: code, trustDevice });
                         if (res.next === "staff-picker") setLocation("/pin");
+                      } catch (e) {
+                         toast({ title: "Invalid Code", variant: "destructive" });
                       } finally {
                         setIsLoading(false);
                       }
