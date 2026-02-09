@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,14 +7,17 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { CalendarIcon, FileText, CheckCircle2, AlertCircle, ArrowLeft, ArrowRight, Calendar } from "lucide-react";
+import { CalendarIcon, FileText, CheckCircle2, AlertCircle, ArrowLeft, ArrowRight, Calendar, Lock, MessageSquareWarning } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { format } from "date-fns";
+import { useSubmittedDays } from "@/hooks/use-submitted-days";
+import { useAuth } from "@/state/auth";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 
 type ServiceField = { key: string; label: string; group: string; isCurrency?: boolean; subGroup?: string };
 
-// Prescription Figures - Special handling for Table Layout
 const PRESCRIPTION_FIELDS = [
   { type: "Paid", epsKey: "eps_rx_paid", paperKey: "paper_rx_paid", label: "Prescriptions (Rx)" },
   { type: "Exempt", epsKey: "eps_rx_exempt", paperKey: "paper_rx_exempt", label: "Prescriptions (Rx)" },
@@ -23,33 +26,20 @@ const PRESCRIPTION_FIELDS = [
 ];
 
 const OTHER_FIELDS: ServiceField[] = [
-  // FIGURES (Running totals)
   { key: "ssp", label: "SSP", group: "Figures" },
   { key: "nhs_prepayment", label: "NHS Prepayment (£)", group: "Figures", isCurrency: true },
   { key: "fp57_refund", label: "FP57 Refund (£)", group: "Figures", isCurrency: true },
-
-  // NMS
   { key: "nms_intervention", label: "NMS Intervention", group: "NMS" },
   { key: "nms_follow_up", label: "NMS Follow-up", group: "NMS" },
-  
-  // DMS
   { key: "dms_stage_1", label: "Stage 1", group: "DMS" },
   { key: "dms_stage_2", label: "Stage 2", group: "DMS" },
   { key: "dms_stage_3", label: "Stage 3", group: "DMS" },
-
-  // Hypertension
   { key: "hypertension_case", label: "Case Finding", group: "Hypertension" },
   { key: "abpm_fitting", label: "ABPM Fitting", group: "Hypertension" },
-
-  // Contraception
   { key: "oral_contraception", label: "Oral Contraception", group: "Contraception" },
   { key: "emergency_contraception", label: "Emergency Contraception", group: "Contraception" },
-
-  // Vaccinations
   { key: "flu", label: "Flu", group: "Vaccinations" },
   { key: "covid", label: "COVID", group: "Vaccinations" },
-
-  // Local Services
   { key: "mas", label: "Minor Ailments Supply", group: "Local Services" },
   { key: "needle_syringe", label: "Needle & Syringe Supply", group: "Local Services" },
   { key: "naloxone", label: "Naloxone Supply", group: "Local Services" },
@@ -58,42 +48,57 @@ const OTHER_FIELDS: ServiceField[] = [
 ];
 
 function normalizeInt(v: string) {
+  if (v === "") return "";
   const n = Number.parseInt(v.replace(/[^0-9-]/g, ""), 10);
-  if (!Number.isFinite(n)) return 0;
+  if (!Number.isFinite(n)) return "";
   return n;
 }
 
 function normalizeFloat(v: string) {
+  if (v === "") return "";
   const n = Number.parseFloat(v.replace(/[^0-9.-]/g, ""));
-  if (!Number.isFinite(n)) return 0;
+  if (!Number.isFinite(n)) return "";
   return n;
 }
 
-function formatCurrency(v: number) {
-  return `£${v.toFixed(2)}`;
+function formatCurrency(v: string | number) {
+  const num = typeof v === 'string' ? parseFloat(v) : v;
+  if (Number.isNaN(num)) return "£0.00";
+  return `£${num.toFixed(2)}`;
 }
 
 export default function DailyFigures() {
   const { toast } = useToast();
+  const { session } = useAuth();
+  const { isSubmitted, markSubmitted } = useSubmittedDays("figures");
   
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [view, setView] = useState<"form" | "summary">("form");
-  const [lastSubmittedValues, setLastSubmittedValues] = useState<Record<string, number> | null>(null);
+  const [lastSubmittedValues, setLastSubmittedValues] = useState<Record<string, string | number> | null>(null);
 
-  const [values, setValues] = useState<Record<string, number>>(() => {
-    const init: Record<string, number> = {};
+  // Initialize with empty strings
+  const [values, setValues] = useState<Record<string, string | number>>(() => {
+    const init: Record<string, string | number> = {};
     PRESCRIPTION_FIELDS.forEach(f => {
-      init[f.epsKey] = 0;
-      init[f.paperKey] = 0;
+      init[f.epsKey] = "";
+      init[f.paperKey] = "";
     });
-    OTHER_FIELDS.forEach(f => { init[f.key] = 0; });
+    OTHER_FIELDS.forEach(f => { init[f.key] = ""; });
     return init;
   });
 
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [highlightMissing, setHighlightMissing] = useState(false);
+  
+  // Problem Report State
+  const [reportOpen, setReportOpen] = useState(false);
+  const [problemMessage, setProblemMessage] = useState("");
 
-  // Computed NMS Total
-  const nmsTotal = (values["nms_intervention"] || 0) + (values["nms_follow_up"] || 0);
+  const formattedDate = date ? format(date, "yyyy-MM-dd") : "";
+  const submissionRecord = useMemo(() => isSubmitted(formattedDate), [formattedDate, isSubmitted]);
+
+  // Computed NMS Total (handling empty strings as 0 for display)
+  const nmsTotal = (Number(values["nms_intervention"] || 0)) + (Number(values["nms_follow_up"] || 0));
 
   const groupedOther = useMemo(() => {
     const groups: Record<string, ServiceField[]> = {};
@@ -108,29 +113,33 @@ export default function DailyFigures() {
       const val = isCurrency ? normalizeFloat(valStr) : normalizeInt(valStr);
       setValues(s => ({ ...s, [key]: val }));
       setValidationError(null);
+      setHighlightMissing(false);
   };
 
   const validate = () => {
      if (!date) return "Trading date is required.";
 
-     // Currency validation (multiples of 9.90)
-     // Floating point modulo can be tricky, so we use a small epsilon
-     const nhsPrep = values["nhs_prepayment"] || 0;
-     const fp57 = values["fp57_refund"] || 0;
+     // Check for empty fields
+     const missing = [...PRESCRIPTION_FIELDS.flatMap(f => [f.epsKey, f.paperKey]), ...OTHER_FIELDS.map(f => f.key)]
+        .filter(k => values[k] === "");
+     
+     if (missing.length > 0) {
+        setHighlightMissing(true);
+        return "Field not filled in. Please ensure all fields have a value (enter 0 if none).";
+     }
 
-     // Check multiples of 9.90 (approximate check)
+     // Currency validation (multiples of 9.90)
+     const nhsPrep = Number(values["nhs_prepayment"]);
+     const fp57 = Number(values["fp57_refund"]);
+
      const isValidMultiple = (val: number) => {
         if (val === 0) return true;
         const ratio = val / 9.90;
         return Math.abs(ratio - Math.round(ratio)) < 0.001;
      };
 
-     if (!isValidMultiple(nhsPrep)) {
-        return "NHS Prepayment must be a multiple of £9.90 (or 0).";
-     }
-     if (!isValidMultiple(fp57)) {
-        return "FP57 Refund must be a multiple of £9.90 (or 0).";
-     }
+     if (!isValidMultiple(nhsPrep)) return "NHS Prepayment must be a multiple of £9.90 (or 0).";
+     if (!isValidMultiple(fp57)) return "FP57 Refund must be a multiple of £9.90 (or 0).";
 
      return null;
   };
@@ -143,18 +152,92 @@ export default function DailyFigures() {
         return;
      }
 
-     // Simulate Save
-     toast({ title: "Figures Saved", description: `Data saved for ${format(date!, "PPP")}.` });
-     
+     markSubmitted(formattedDate, session.staff?.name || "Unknown");
      setLastSubmittedValues({ ...values });
      setView("summary");
      
-     // Reset Form
-     const next: Record<string, number> = {};
-     PRESCRIPTION_FIELDS.forEach(f => { next[f.epsKey] = 0; next[f.paperKey] = 0; });
-     OTHER_FIELDS.forEach(f => { next[f.key] = 0; });
+     // Reset Form for next entry
+     const next: Record<string, string | number> = {};
+     PRESCRIPTION_FIELDS.forEach(f => { next[f.epsKey] = ""; next[f.paperKey] = ""; });
+     OTHER_FIELDS.forEach(f => { next[f.key] = ""; });
      setValues(next);
+     setHighlightMissing(false);
   };
+
+  const handleRaiseProblem = () => {
+     toast({ title: "Problem Reported", description: "Head Office has been notified." });
+     setReportOpen(false);
+     setProblemMessage("");
+  };
+
+  // If already submitted and user is trying to view form for that day
+  if (submissionRecord && view === "form" && !lastSubmittedValues) {
+     return (
+        <AppShell>
+           <div className="flex flex-col gap-6 max-w-3xl mx-auto mt-10">
+              <div className="flex items-center gap-4">
+                 <Button variant="ghost" onClick={() => window.history.back()}>
+                    <ArrowLeft className="h-4 w-4 mr-2" /> Back
+                 </Button>
+                 <h1 className="font-serif text-2xl">Daily Figures</h1>
+              </div>
+
+              <Card className="p-8 border-l-4 border-l-blue-500 bg-blue-50/50">
+                 <div className="flex items-start gap-4">
+                    <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                       <Lock className="h-6 w-6" />
+                    </div>
+                    <div className="space-y-2 flex-1">
+                       <h2 className="text-lg font-semibold text-blue-900">Already Submitted</h2>
+                       <p className="text-blue-800/80">
+                          Figures for <span className="font-medium">{format(date!, "PPP")}</span> were already submitted by <span className="font-medium">{submissionRecord.user}</span> on {new Date(submissionRecord.timestamp).toLocaleTimeString()}.
+                       </p>
+                       <p className="text-sm text-blue-800/60">
+                          Only one submission is allowed per trading day. If this is incorrect, please raise a problem.
+                       </p>
+                    </div>
+                 </div>
+                 
+                 <div className="mt-6 flex gap-3">
+                    <Dialog open={reportOpen} onOpenChange={setReportOpen}>
+                       <DialogTrigger asChild>
+                          <Button variant="outline" className="text-destructive hover:text-destructive border-destructive/20 hover:bg-destructive/5">
+                             <MessageSquareWarning className="h-4 w-4 mr-2" />
+                             Raise a problem
+                          </Button>
+                       </DialogTrigger>
+                       <DialogContent>
+                          <DialogHeader>
+                             <DialogTitle>Raise a Problem</DialogTitle>
+                             <DialogDescription>
+                                Describe the issue with this submission. Head Office will be notified.
+                             </DialogDescription>
+                          </DialogHeader>
+                          <div className="space-y-4 py-4">
+                             <div className="grid gap-2">
+                                <Label>Message</Label>
+                                <Textarea 
+                                   value={problemMessage} 
+                                   onChange={e => setProblemMessage(e.target.value)} 
+                                   placeholder="e.g. Incorrect totals entered by mistake..."
+                                />
+                             </div>
+                          </div>
+                          <DialogFooter>
+                             <Button onClick={handleRaiseProblem}>Send Report</Button>
+                          </DialogFooter>
+                       </DialogContent>
+                    </Dialog>
+                    
+                    <Button variant="secondary" onClick={() => setDate(new Date())}>
+                       Select Different Date
+                    </Button>
+                 </div>
+              </Card>
+           </div>
+        </AppShell>
+     );
+  }
 
   if (view === "summary" && lastSubmittedValues) {
      return (
@@ -164,7 +247,7 @@ export default function DailyFigures() {
                  <CheckCircle2 className="h-10 w-10" />
               </div>
               <div className="text-center space-y-2">
-                 <h2 className="text-3xl font-semibold tracking-tight">Submission Successful</h2>
+                 <h2 className="text-3xl font-semibold tracking-tight">Submission Complete</h2>
                  <p className="text-muted-foreground">
                     Daily figures for <span className="font-medium text-foreground">{date ? format(date, "PPP") : "Unknown Date"}</span> have been recorded.
                  </p>
@@ -184,7 +267,7 @@ export default function DailyFigures() {
                     <div className="flex justify-between border-b pb-2">
                        <span>Total NMS</span>
                        <span className="font-mono font-medium">
-                          {(lastSubmittedValues["nms_intervention"] || 0) + (lastSubmittedValues["nms_follow_up"] || 0)}
+                          {(Number(lastSubmittedValues["nms_intervention"]) || 0) + (Number(lastSubmittedValues["nms_follow_up"]) || 0)}
                        </span>
                     </div>
                     <div className="flex justify-between border-b pb-2">
@@ -198,7 +281,7 @@ export default function DailyFigures() {
                  <Button variant="outline" className="flex-1 h-12" onClick={() => window.location.href = "/"}>
                     <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
                  </Button>
-                 <Button className="flex-1 h-12" onClick={() => setView("form")}>
+                 <Button className="flex-1 h-12" onClick={() => { setView("form"); setLastSubmittedValues(null); setDate(undefined); }}>
                     Enter Another Day <ArrowRight className="ml-2 h-4 w-4" />
                  </Button>
               </div>
@@ -213,8 +296,7 @@ export default function DailyFigures() {
         <div>
           <div className="font-serif text-2xl tracking-tight" data-testid="text-daily-figures-title">Daily Figures</div>
           <div className="text-sm text-muted-foreground" data-testid="text-daily-figures-subtitle">
-            Enter today's running totals. All fields are mandatory and default to 0.
-            Monthly aggregation is handled automatically.
+            Enter today's running totals. All fields are mandatory (please enter 0 if none).
           </div>
         </div>
 
@@ -272,31 +354,31 @@ export default function DailyFigures() {
                       <div className="grid grid-cols-[1fr_1fr_1fr] gap-4 items-center bg-slate-50/50 p-2 rounded-lg border border-transparent hover:border-border transition-colors">
                           <div className="text-sm font-medium text-muted-foreground">Prescriptions (Rx)</div>
                           <Input 
-                             className="h-10 text-center font-mono border-primary/20 focus-visible:ring-primary/20" 
+                             className={`h-10 text-center font-mono ${highlightMissing && values["eps_rx_paid"] === "" ? "border-destructive ring-destructive/20" : "border-primary/20 focus-visible:ring-primary/20"}`}
                              value={values["eps_rx_paid"]}
                              onChange={e => updateValue("eps_rx_paid", e.target.value)}
-                             placeholder="0"
+                             placeholder=""
                           />
                           <Input 
-                             className="h-10 text-center font-mono" 
+                             className={`h-10 text-center font-mono ${highlightMissing && values["paper_rx_paid"] === "" ? "border-destructive ring-destructive/20" : ""}`}
                              value={values["paper_rx_paid"]}
                              onChange={e => updateValue("paper_rx_paid", e.target.value)}
-                             placeholder="0"
+                             placeholder=""
                           />
                       </div>
                       <div className="grid grid-cols-[1fr_1fr_1fr] gap-4 items-center bg-slate-50/50 p-2 rounded-lg border border-transparent hover:border-border transition-colors">
                           <div className="text-sm font-medium text-muted-foreground">Items</div>
                           <Input 
-                             className="h-10 text-center font-mono border-primary/20 focus-visible:ring-primary/20" 
+                             className={`h-10 text-center font-mono ${highlightMissing && values["eps_items_paid"] === "" ? "border-destructive ring-destructive/20" : "border-primary/20 focus-visible:ring-primary/20"}`}
                              value={values["eps_items_paid"]}
                              onChange={e => updateValue("eps_items_paid", e.target.value)}
-                             placeholder="0"
+                             placeholder=""
                           />
                           <Input 
-                             className="h-10 text-center font-mono" 
+                             className={`h-10 text-center font-mono ${highlightMissing && values["paper_items_paid"] === "" ? "border-destructive ring-destructive/20" : ""}`}
                              value={values["paper_items_paid"]}
                              onChange={e => updateValue("paper_items_paid", e.target.value)}
-                             placeholder="0"
+                             placeholder=""
                           />
                       </div>
                   </div>
@@ -308,31 +390,31 @@ export default function DailyFigures() {
                       <div className="grid grid-cols-[1fr_1fr_1fr] gap-4 items-center bg-slate-50/50 p-2 rounded-lg border border-transparent hover:border-border transition-colors">
                           <div className="text-sm font-medium text-muted-foreground">Prescriptions (Rx)</div>
                           <Input 
-                             className="h-10 text-center font-mono border-primary/20 focus-visible:ring-primary/20" 
+                             className={`h-10 text-center font-mono ${highlightMissing && values["eps_rx_exempt"] === "" ? "border-destructive ring-destructive/20" : "border-primary/20 focus-visible:ring-primary/20"}`}
                              value={values["eps_rx_exempt"]}
                              onChange={e => updateValue("eps_rx_exempt", e.target.value)}
-                             placeholder="0"
+                             placeholder=""
                           />
                           <Input 
-                             className="h-10 text-center font-mono" 
+                             className={`h-10 text-center font-mono ${highlightMissing && values["paper_rx_exempt"] === "" ? "border-destructive ring-destructive/20" : ""}`}
                              value={values["paper_rx_exempt"]}
                              onChange={e => updateValue("paper_rx_exempt", e.target.value)}
-                             placeholder="0"
+                             placeholder=""
                           />
                       </div>
                       <div className="grid grid-cols-[1fr_1fr_1fr] gap-4 items-center bg-slate-50/50 p-2 rounded-lg border border-transparent hover:border-border transition-colors">
                           <div className="text-sm font-medium text-muted-foreground">Items</div>
                           <Input 
-                             className="h-10 text-center font-mono border-primary/20 focus-visible:ring-primary/20" 
+                             className={`h-10 text-center font-mono ${highlightMissing && values["eps_items_exempt"] === "" ? "border-destructive ring-destructive/20" : "border-primary/20 focus-visible:ring-primary/20"}`}
                              value={values["eps_items_exempt"]}
                              onChange={e => updateValue("eps_items_exempt", e.target.value)}
-                             placeholder="0"
+                             placeholder=""
                           />
                           <Input 
-                             className="h-10 text-center font-mono" 
+                             className={`h-10 text-center font-mono ${highlightMissing && values["paper_items_exempt"] === "" ? "border-destructive ring-destructive/20" : ""}`}
                              value={values["paper_items_exempt"]}
                              onChange={e => updateValue("paper_items_exempt", e.target.value)}
-                             placeholder="0"
+                             placeholder=""
                           />
                       </div>
                   </div>
@@ -358,16 +440,11 @@ export default function DailyFigures() {
                       </Label>
                       <Input
                         inputMode={f.isCurrency ? "decimal" : "numeric"}
-                        value={String(values[f.key] ?? 0)}
+                        value={values[f.key]}
                         onChange={(e) => updateValue(f.key, e.target.value, f.isCurrency)}
-                        onBlur={() => {
-                          const cur = values[f.key];
-                          if (cur === undefined || cur === null || Number.isNaN(cur)) {
-                            setValues((s) => ({ ...s, [f.key]: 0 }));
-                          }
-                        }}
-                        className="h-10 font-mono bg-background/50"
+                        className={`h-10 font-mono bg-background/50 ${highlightMissing && values[f.key] === "" ? "border-destructive ring-destructive/20" : ""}`}
                         data-testid={`input-${f.key}`}
+                        placeholder=""
                       />
                     </div>
                   ))}
@@ -398,17 +475,18 @@ export default function DailyFigures() {
                     variant="secondary"
                     className="w-full h-11"
                     onClick={() => {
-                      const next: Record<string, number> = {};
+                      const next: Record<string, string | number> = {};
                       PRESCRIPTION_FIELDS.forEach(f => {
-                          next[f.epsKey] = 0;
-                          next[f.paperKey] = 0;
+                          next[f.epsKey] = "";
+                          next[f.paperKey] = "";
                       });
-                      OTHER_FIELDS.forEach(f => { next[f.key] = 0; });
+                      OTHER_FIELDS.forEach(f => { next[f.key] = ""; });
                       setValues(next);
                       setValidationError(null);
+                      setHighlightMissing(false);
                     }}
                   >
-                    Reset All to 0
+                    Reset All
                   </Button>
                 </div>
                 

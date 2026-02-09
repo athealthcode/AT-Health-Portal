@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/state/auth";
+import logo from "@/assets/logo.png";
 
 type NavItem = {
   href: string;
@@ -74,27 +75,23 @@ export function AppShell({ children }: PropsWithChildren) {
     session.scope.type === "pharmacy" ? session.scope.pharmacyName : "Head Office";
 
   const header = (
-    <div className="flex items-center justify-between gap-3">
-      <div className="flex items-center gap-3">
-        <div className="h-10 w-10 rounded-2xl bg-primary text-primary-foreground grid place-items-center shadow-md">
-          <span className="font-mono text-sm">AT</span>
-        </div>
-        <div className="leading-tight">
-          <div className="font-serif text-xl tracking-tight" data-testid="text-app-title">AT Health Portal</div>
-          <div className="text-xs text-muted-foreground" data-testid="text-scope">{scopeLabel}</div>
-        </div>
+    <div className="flex flex-col gap-4">
+      <div className="bg-primary/5 rounded-xl p-4 flex items-center justify-center">
+         <img src={logo} alt="AT Health" className="h-10 w-auto object-contain" />
       </div>
 
-      <div className="flex items-center gap-2">
-        <Badge variant="secondary" className="pill bg-background/50" data-testid="badge-role">
-          <Building2 className="h-3.5 w-3.5 mr-1.5" />
-          {session.role ?? "—"}
-        </Badge>
-        {session.staff && (
-           <Badge variant="outline" className="pill bg-background/50" data-testid="badge-staff">
-              {session.staff.name}
-           </Badge>
-        )}
+      <div className="px-1">
+        <div className="font-medium text-sm text-foreground" data-testid="text-scope">{scopeLabel}</div>
+        <div className="flex items-center gap-2 mt-1">
+          <Badge variant="secondary" className="pill bg-background/50 text-[10px] h-5" data-testid="badge-role">
+            {session.role ?? "Guest"}
+          </Badge>
+          {session.staff && (
+             <Badge variant="outline" className="pill bg-background/50 text-[10px] h-5" data-testid="badge-staff">
+                {session.staff.name}
+             </Badge>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -169,7 +166,7 @@ export function AppShell({ children }: PropsWithChildren) {
           <div className="lg:hidden">
             <div className="surface rounded-2xl p-4">
               <div className="flex items-center justify-between">
-                <div className="min-w-0">{header}</div>
+                 <img src={logo} alt="AT Health" className="h-8 w-auto object-contain" />
                 <Sheet open={open} onOpenChange={setOpen}>
                   <SheetTrigger asChild>
                     <Button variant="outline" className="h-10" data-testid="button-open-nav">
@@ -178,6 +175,7 @@ export function AppShell({ children }: PropsWithChildren) {
                   </SheetTrigger>
                   <SheetContent side="right" className="w-[300px]">
                     <div className="pt-6">
+                      <div className="mb-6">{header}</div>
                       <NavLinks compact />
                       <Separator className="my-4" />
                       <div className="space-y-2">
@@ -229,7 +227,7 @@ export function AppShell({ children }: PropsWithChildren) {
                  <span className="mx-1">•</span>
                  Trusted Device Active
               </div>
-              <div className="opacity-50">v0.5.0</div>
+              <div className="opacity-50">v0.5.1</div>
             </div>
           </main>
         </div>

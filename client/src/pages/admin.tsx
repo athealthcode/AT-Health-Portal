@@ -8,10 +8,12 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth, Role, TrustedBrowser } from "@/state/auth";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { useAuth, Role } from "@/state/auth";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Trash2, AlertTriangle, Shield, Clock, Monitor } from "lucide-react";
+import { Trash2, AlertTriangle, Shield, Clock, Monitor, Info, Lock } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type Pharmacy = {
   id: string;
@@ -23,13 +25,20 @@ type Pharmacy = {
 export default function Admin() {
   const { toast } = useToast();
   const { users, inviteUser, deleteUser, session, trustedBrowsers, revokeTrustedBrowser } = useAuth();
+  
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState<{ type: 'user' | 'pharmacy', id: string } | null>(null);
+  const [masterPin, setMasterPin] = useState("");
+  const [deleteStep, setDeleteStep] = useState(0); // 0 = PIN, 1 = Confirm 1, 2 = Confirm 2, 3 = Final
 
   // Invite Form State
   const [newEmail, setNewEmail] = useState("");
   const [newRole, setNewRole] = useState<Role>("Pharmacy Login");
   const [newScopeType, setNewScopeType] = useState<"headoffice" | "pharmacy">("pharmacy");
   const [newPharmacyId, setNewPharmacyId] = useState("bowland");
+
+  // Audit Filter
+  const [auditFilter, setAuditFilter] = useState<"all" | "pharmacy" | "headoffice">("all");
 
   // Trusted Browser Dialog
   const [viewingUserBrowsers, setViewingUserBrowsers] = useState<string | null>(null);
@@ -40,6 +49,16 @@ export default function Admin() {
     { id: "wilmslow", name: "Wilmslow Pharmacy", openingHours: "Mon–Fri 09:00–18:00; Sat 10:00–14:00", ipAllowlist: ["81.100.12.0/24"] },
   ]);
 
+  // Auto-set scope based on role
+  const handleRoleChange = (role: Role) => {
+     setNewRole(role);
+     if (role === "Head Office Admin" || role === "Finance" || role === "Super Admin") {
+        setNewScopeType("headoffice");
+     } else {
+        setNewScopeType("pharmacy");
+     }
+  };
+
   const handleInvite = () => {
     if (!newEmail) return;
     inviteUser(newEmail, newRole, newScopeType, newPharmacyId);
@@ -48,7 +67,29 @@ export default function Admin() {
     toast({ title: "User Invited", description: `${newEmail} can now log in.` });
   };
 
+  const handleDeleteAttempt = () => {
+     if (masterPin !== "123456") { // Mock Master PIN
+        toast({ title: "Invalid Master PIN", variant: "destructive" });
+        return;
+     }
+     if (deleteStep < 3) {
+        setDeleteStep(s => s + 1);
+        return;
+     }
+     
+     if (deleteConfirmOpen?.type === "user") {
+        deleteUser(deleteConfirmOpen.id);
+        toast({ title: "User Deleted", description: "Audit log created. Notification sent to info@at-health.co.uk" });
+     } else {
+        toast({ title: "Pharmacy Deleted", description: "Branch removed." });
+     }
+     setDeleteConfirmOpen(null);
+     setMasterPin("");
+     setDeleteStep(0);
+  };
+
   const canManageUsers = session.role === "Head Office Admin" || session.role === "Super Admin";
+  const canDeleteBranch = session.role === "Super Admin"; // Only super admin can delete branch
 
   const viewingUser = users.find(u => u.id === viewingUserBrowsers);
   const userTrustedBrowsers = viewingUserBrowsers 
@@ -59,40 +100,12 @@ export default function Admin() {
     <AppShell>
       <div className="flex flex-col gap-5">
         <div>
-          <div className="font-serif text-2xl tracking-tight" data-testid="text-admin-title">Admin</div>
+          <div className="font-serif text-2xl tracking-tight" data-testid="text-admin-title">Settings</div>
           <div className="text-sm text-muted-foreground" data-testid="text-admin-subtitle">
             Manage pharmacies, users, roles, and security settings.
           </div>
         </div>
         
-        {/* Test Data Awareness Banner - Only for Admins */}
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
-           <div className="flex items-center gap-2 mb-2 font-semibold">
-              <AlertTriangle className="h-4 w-4" />
-              Test Data (Seed Users)
-           </div>
-           <div className="text-xs grid md:grid-cols-2 lg:grid-cols-3 gap-2">
-              <div>
-                 <strong>Head Office:</strong> info@at-health.co.uk
-              </div>
-              <div>
-                 <strong>Finance:</strong> finance@at-health.co.uk
-              </div>
-              <div>
-                 <strong>Bowland:</strong> info@bowlandpharmacy.co.uk
-              </div>
-              <div>
-                 <strong>Denton:</strong> info@dentonpharmacy.co.uk
-              </div>
-              <div>
-                 <strong>Wilmslow:</strong> info@wilmslowpharmacy.co.uk
-              </div>
-           </div>
-           <div className="text-[10px] mt-2 opacity-75">
-              Warning: Temporary passwords in use. Please reset after testing.
-           </div>
-        </div>
-
         <div className="grid gap-3 lg:grid-cols-2">
           {/* USERS CARD */}
           <Card className="rounded-2xl border bg-card/60 p-5 lg:col-span-2" data-testid="card-users">
@@ -113,8 +126,21 @@ export default function Admin() {
                       <Input value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="name@athealth.co.uk" />
                     </div>
                     <div className="grid gap-2">
-                      <Label>Role</Label>
-                      <Select value={newRole} onValueChange={(v: Role) => setNewRole(v)}>
+                      <div className="flex items-center gap-2">
+                         <Label>Role</Label>
+                         <TooltipProvider>
+                           <Tooltip>
+                              <TooltipTrigger><Info className="h-3 w-3 text-muted-foreground" /></TooltipTrigger>
+                              <TooltipContent className="max-w-[300px] text-xs">
+                                 <p><strong>Pharmacy Login:</strong> Daily figures, cashing up, standard reports.</p>
+                                 <p><strong>Pharmacy Manager:</strong> Full branch access + staff management.</p>
+                                 <p><strong>Head Office Admin:</strong> Global view, user management, all reports.</p>
+                                 <p><strong>Finance:</strong> Read-only access to financial reports.</p>
+                              </TooltipContent>
+                           </Tooltip>
+                         </TooltipProvider>
+                      </div>
+                      <Select value={newRole} onValueChange={(v: Role) => handleRoleChange(v)}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
@@ -123,13 +149,12 @@ export default function Admin() {
                           <SelectItem value="Pharmacy Manager">Pharmacy Manager</SelectItem>
                           <SelectItem value="Head Office Admin">Head Office Admin</SelectItem>
                           <SelectItem value="Finance">Finance</SelectItem>
-                          <SelectItem value="Super Admin">Super Admin</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="grid gap-2">
                       <Label>Scope</Label>
-                      <Select value={newScopeType} onValueChange={(v: any) => setNewScopeType(v)}>
+                      <Select value={newScopeType} onValueChange={(v: any) => setNewScopeType(v)} disabled={newRole !== "Pharmacy Login" && newRole !== "Pharmacy Manager"}>
                          <SelectTrigger><SelectValue /></SelectTrigger>
                          <SelectContent>
                             <SelectItem value="pharmacy">Pharmacy</SelectItem>
@@ -193,7 +218,11 @@ export default function Admin() {
                             variant="ghost"
                             className="text-destructive hover:text-destructive hover:bg-destructive/10"
                             disabled={!canManageUsers}
-                            onClick={() => deleteUser(u.id)}
+                            onClick={() => {
+                               setDeleteConfirmOpen({ type: 'user', id: u.id });
+                               setDeleteStep(0);
+                               setMasterPin("");
+                            }}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -204,10 +233,45 @@ export default function Admin() {
                 </TableBody>
               </Table>
             </div>
-            {!canManageUsers && (
-               <div className="mt-2 text-xs text-muted-foreground">Only Admins can manage users.</div>
-            )}
           </Card>
+
+          {/* MASTER PIN DELETE DIALOG */}
+          <Dialog open={!!deleteConfirmOpen} onOpenChange={(o) => !o && setDeleteConfirmOpen(null)}>
+             <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                   <DialogTitle className="flex items-center gap-2 text-destructive">
+                      <AlertTriangle className="h-5 w-5" />
+                      {deleteStep === 0 ? "Confirm Deletion" : "ARE YOU SURE?"}
+                   </DialogTitle>
+                   <DialogDescription>
+                      This action is permanent and will be audit logged.
+                   </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                   <div className="grid gap-2">
+                      <Label>Enter Master PIN to continue</Label>
+                      <Input 
+                         type="password" 
+                         value={masterPin} 
+                         onChange={e => setMasterPin(e.target.value)} 
+                         placeholder="******" 
+                         className="font-mono tracking-widest"
+                      />
+                   </div>
+                   {deleteStep > 0 && (
+                      <div className="text-sm font-bold text-destructive text-center p-2 bg-destructive/10 rounded">
+                         CONFIRMATION STEP {deleteStep}/3
+                      </div>
+                   )}
+                </div>
+                <DialogFooter>
+                   <Button variant="ghost" onClick={() => setDeleteConfirmOpen(null)}>Cancel</Button>
+                   <Button variant="destructive" onClick={handleDeleteAttempt}>
+                      {deleteStep < 3 ? "Confirm & Continue" : "DELETE PERMANENTLY"}
+                   </Button>
+                </DialogFooter>
+             </DialogContent>
+          </Dialog>
 
           {/* Trusted Devices Dialog */}
           <Dialog open={!!viewingUserBrowsers} onOpenChange={(o) => !o && setViewingUserBrowsers(null)}>
@@ -259,7 +323,7 @@ export default function Admin() {
             <div className="text-sm font-semibold" data-testid="text-pharmacies-title">Pharmacies & IP Security</div>
             <div className="mt-3 grid gap-3">
               {pharmacies.map((p) => (
-                <div key={p.id} className="rounded-xl border bg-background/40 p-4" data-testid={`card-pharmacy-${p.id}`}>
+                <div key={p.id} className="rounded-xl border bg-background/40 p-4 relative group" data-testid={`card-pharmacy-${p.id}`}>
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="font-medium" data-testid={`text-pharmacy-name-${p.id}`}>{p.name}</div>
@@ -274,6 +338,21 @@ export default function Admin() {
                       <Badge key={idx} variant="outline" className="pill" data-testid={`badge-ip-${p.id}-${idx}`}>{cidr}</Badge>
                     ))}
                   </div>
+
+                  {canDeleteBranch && (
+                     <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:bg-destructive/10"
+                        onClick={() => {
+                           setDeleteConfirmOpen({ type: 'pharmacy', id: p.id });
+                           setDeleteStep(0);
+                           setMasterPin("");
+                        }}
+                     >
+                        <Trash2 className="h-4 w-4" />
+                     </Button>
+                  )}
                 </div>
               ))}
             </div>
@@ -281,7 +360,20 @@ export default function Admin() {
 
           {/* AUDIT LOGS CARD */}
           <Card className="rounded-2xl border bg-card/60 p-5" data-testid="card-audit">
-            <div className="text-sm font-semibold mb-3" data-testid="text-audit-title">Recent Audit Logs</div>
+            <div className="flex items-center justify-between mb-4">
+               <div className="text-sm font-semibold" data-testid="text-audit-title">Audit Logs</div>
+               <Select value={auditFilter} onValueChange={(v: any) => setAuditFilter(v)}>
+                  <SelectTrigger className="w-[140px] h-8 text-xs">
+                     <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                     <SelectItem value="all">All Events</SelectItem>
+                     <SelectItem value="pharmacy">Pharmacy Only</SelectItem>
+                     <SelectItem value="headoffice">Head Office Only</SelectItem>
+                  </SelectContent>
+               </Select>
+            </div>
+            
             <div className="overflow-hidden rounded-xl border bg-background/40">
               <Table>
                 <TableHeader>
@@ -292,25 +384,26 @@ export default function Admin() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <TableRow>
-                     <TableCell>10:42</TableCell>
-                     <TableCell>Sarah Ahmed</TableCell>
-                     <TableCell>Submitted Daily Figures</TableCell>
-                  </TableRow>
-                  <TableRow>
-                     <TableCell>10:15</TableCell>
-                     <TableCell>Helen Carter</TableCell>
-                     <TableCell>User Invited</TableCell>
-                  </TableRow>
-                  <TableRow>
-                     <TableCell>09:30</TableCell>
-                     <TableCell>System</TableCell>
-                     <TableCell>Report Generated</TableCell>
-                  </TableRow>
+                  {[
+                     { time: "10:42", actor: "Sarah Ahmed", action: "Submitted Daily Figures", scope: "pharmacy" },
+                     { time: "10:15", actor: "Helen Carter", action: "User Invited", scope: "headoffice" },
+                     { time: "09:30", actor: "System", action: "Report Generated", scope: "headoffice" },
+                     { time: "Yesterday", actor: "James Wilson", action: "Cashing Up", scope: "pharmacy" },
+                  ]
+                  .filter(l => auditFilter === "all" || l.scope === auditFilter)
+                  .map((log, i) => (
+                     <TableRow key={i}>
+                        <TableCell className="py-2 text-xs">{log.time}</TableCell>
+                        <TableCell className="py-2 text-xs font-medium">{log.actor}</TableCell>
+                        <TableCell className="py-2 text-xs text-muted-foreground">{log.action}</TableCell>
+                     </TableRow>
+                  ))}
                 </TableBody>
               </Table>
             </div>
-            <div className="mt-3 text-xs text-muted-foreground">Real-time audit logging enabled.</div>
+            <div className="mt-3 text-[10px] text-muted-foreground text-center">
+               Logs are retained indefinitely.
+            </div>
           </Card>
 
         </div>
