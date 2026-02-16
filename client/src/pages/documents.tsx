@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/state/auth";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const DEFAULT_CONFIG = {
   bowland: {
@@ -28,10 +29,19 @@ const DEFAULT_CONFIG = {
   },
 };
 
+const PHARMACIES = [
+  { id: "bowland", name: "Bowland Pharmacy" },
+  { id: "denton", name: "Denton Pharmacy" },
+  { id: "wilmslow", name: "Wilmslow Pharmacy" },
+];
+
 export default function Documents() {
   const { session } = useAuth();
   const [fallbackOnly, setFallbackOnly] = useState(false);
   const [config, setConfig] = useState(DEFAULT_CONFIG);
+  
+  // Head Office Selector State
+  const [selectedPharmacyId, setSelectedPharmacyId] = useState<string>("bowland");
 
   useEffect(() => {
      const saved = localStorage.getItem('sharepoint_config');
@@ -40,8 +50,13 @@ export default function Documents() {
      }
   }, []);
 
-  const scopeKey = session.scope.type === "pharmacy" ? session.scope.pharmacyId : "headoffice";
-  const scopeLabel = session.scope.type === "pharmacy" ? session.scope.pharmacyName : "Head Office";
+  const isHeadOffice = session.scope.type === "headoffice";
+  
+  // Determine which config key to use
+  const scopeKey = isHeadOffice ? selectedPharmacyId : (session.scope.type === "pharmacy" ? session.scope.pharmacyId : "headoffice");
+  const scopeLabel = isHeadOffice 
+     ? PHARMACIES.find(p => p.id === selectedPharmacyId)?.name || "Selected Pharmacy"
+     : (session.scope.type === "pharmacy" ? session.scope.pharmacyName : "Head Office");
 
   const cfg = useMemo(() => config[scopeKey as keyof typeof config] || DEFAULT_CONFIG.headoffice, [config, scopeKey]);
 
@@ -55,12 +70,29 @@ export default function Documents() {
               Embedded SharePoint per pharmacy (view/download only) with a fallback link.
             </div>
           </div>
-          <Badge variant="secondary" className="pill" data-testid="badge-documents-scope">Scope: {scopeLabel}</Badge>
+          
+          {isHeadOffice ? (
+             <div className="flex items-center gap-2">
+                <Label>View for:</Label>
+                <Select value={selectedPharmacyId} onValueChange={setSelectedPharmacyId}>
+                   <SelectTrigger className="w-[200px]">
+                      <SelectValue />
+                   </SelectTrigger>
+                   <SelectContent>
+                      {PHARMACIES.map(p => (
+                         <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                      ))}
+                   </SelectContent>
+                </Select>
+             </div>
+          ) : (
+             <Badge variant="secondary" className="pill" data-testid="badge-documents-scope">Scope: {scopeLabel}</Badge>
+          )}
         </div>
 
         <Card className="rounded-2xl border bg-card/60 p-5" data-testid="card-documents-settings">
           <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="text-sm font-semibold" data-testid="text-documents-access">Access</div>
+            <div className="text-sm font-semibold" data-testid="text-documents-access">Access: {scopeLabel}</div>
             <Badge variant="outline" className="pill" data-testid="badge-readonly">
               <ShieldCheck className="h-3.5 w-3.5 mr-1.5" /> View/download only
             </Badge>

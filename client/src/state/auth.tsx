@@ -168,6 +168,15 @@ const PHARMACY_NAMES: Record<string, string> = {
   wilmslow: "Wilmslow Pharmacy"
 };
 
+const DEFAULT_SESSION: SessionState = {
+  isAuthenticated: false,
+  staffPinVerified: false,
+  scope: { type: "pharmacy", pharmacyId: "bowland", pharmacyName: "Bowland Pharmacy" },
+  pinAttemptsLeft: 3,
+  pinLockoutUntil: null,
+  currentIp: DEFAULT_IP,
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [users, setUsers] = useState<UserAccount[]>(INITIAL_USERS);
   const [trustedBrowsers, setTrustedBrowsers] = useState<TrustedBrowser[]>([]);
@@ -176,16 +185,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Dev only: Store the OTP for the current login attempt
   const [currentOtp, setCurrentOtp] = useState<string | null>(null);
 
-  const [session, setSession] = useState<SessionState>({
-    isAuthenticated: false,
-    staffPinVerified: false,
-    scope: { type: "pharmacy", pharmacyId: "bowland", pharmacyName: "Bowland Pharmacy" },
-    pinAttemptsLeft: 3,
-    pinLockoutUntil: null,
-    currentIp: DEFAULT_IP,
+  // Load session from localStorage if available
+  const [session, setSession] = useState<SessionState>(() => {
+    const saved = localStorage.getItem("auth_session");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        // Ensure IP is current if we want to be strict, but for persistence we keep user logged in
+        return { ...parsed, currentIp: DEFAULT_IP }; 
+      } catch (e) {
+        return DEFAULT_SESSION;
+      }
+    }
+    return DEFAULT_SESSION;
   });
 
   const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
+
+  // Persist session changes
+  useEffect(() => {
+    localStorage.setItem("auth_session", JSON.stringify(session));
+  }, [session]);
 
   // Sync currentIp to session
   useEffect(() => {
@@ -205,7 +225,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSelectedStaffId(null);
     } else {
         // Full logout
-        setSession({
+        const newSession = {
             isAuthenticated: false,
             staffPinVerified: false,
             userEmail: undefined,
@@ -215,7 +235,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             pinAttemptsLeft: 3,
             pinLockoutUntil: null,
             currentIp,
-        });
+        };
+        setSession(newSession as SessionState);
+        localStorage.removeItem("auth_session"); // Clear persistence
         setSelectedStaffId(null);
         setCurrentOtp(null);
     }

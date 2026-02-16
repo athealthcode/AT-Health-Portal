@@ -12,7 +12,7 @@ import { useAuth } from "@/state/auth";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { AlertCircle, CheckCircle2, Lock, Upload, FileSpreadsheet, PoundSterling, TrendingUp, AlertTriangle, ShieldCheck, Download } from "lucide-react";
+import { AlertCircle, CheckCircle2, Lock, Upload, FileSpreadsheet, PoundSterling, TrendingUp, AlertTriangle, ShieldCheck, Download, Save } from "lucide-react";
 import { format } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 
@@ -38,6 +38,7 @@ type MonthlyState = {
   gates: Record<PharmacyId, BonusGate[]>;
   privateSales: Record<PharmacyId, { service: string; quantity: number; revenue: number }[]>;
   nhsPerformance: Record<PharmacyId, { items: number; nms: number; targetItems: number; targetNms: number }>;
+  expenses: Record<PharmacyId, { workingDays: number; googleAds: number; advertising: number; other: number }>;
 };
 
 // --- MOCK DATA ---
@@ -56,6 +57,8 @@ const DEFAULT_GATES: BonusGate[] = [
   { id: "staff_budget", label: "Staff Hours within Budget", passed: false },
   { id: "incidents", label: "No Critical Safety Incidents", passed: true }, // Default true for optimism
 ];
+
+const DEFAULT_EXPENSES = { workingDays: 22, googleAds: 0, advertising: 0, other: 0 };
 
 const PHARMACIES: { id: PharmacyId; name: string }[] = [
   { id: "bowland", name: "Bowland Pharmacy" },
@@ -86,6 +89,11 @@ export default function BonusPerformance() {
            bowland: { items: 9120, nms: 62, targetItems: 8800, targetNms: 50 }, // 6-month avg simulated
            denton: { items: 8405, nms: 48, targetItems: 8500, targetNms: 45 },
            wilmslow: { items: 7287, nms: 32, targetItems: 7000, targetNms: 30 },
+        },
+        expenses: {
+           bowland: { ...DEFAULT_EXPENSES },
+           denton: { ...DEFAULT_EXPENSES },
+           wilmslow: { ...DEFAULT_EXPENSES },
         }
      }
   });
@@ -94,7 +102,8 @@ export default function BonusPerformance() {
      status: "draft",
      gates: { bowland: [...DEFAULT_GATES], denton: [...DEFAULT_GATES], wilmslow: [...DEFAULT_GATES] },
      privateSales: { bowland: [], denton: [], wilmslow: [] },
-     nhsPerformance: { bowland: { items: 0, nms: 0, targetItems: 0, targetNms: 0 }, denton: { items: 0, nms: 0, targetItems: 0, targetNms: 0 }, wilmslow: { items: 0, nms: 0, targetItems: 0, targetNms: 0 } }
+     nhsPerformance: { bowland: { items: 0, nms: 0, targetItems: 0, targetNms: 0 }, denton: { items: 0, nms: 0, targetItems: 0, targetNms: 0 }, wilmslow: { items: 0, nms: 0, targetItems: 0, targetNms: 0 } },
+     expenses: { bowland: { ...DEFAULT_EXPENSES }, denton: { ...DEFAULT_EXPENSES }, wilmslow: { ...DEFAULT_EXPENSES } }
   };
 
   const isLocked = currentMonthData.status === "locked";
@@ -111,7 +120,51 @@ export default function BonusPerformance() {
      });
   };
 
+  const handleExpenseChange = (pharmacyId: PharmacyId, field: keyof typeof DEFAULT_EXPENSES, value: string) => {
+     if (isLocked) return;
+     setMonthlyData(prev => ({
+        ...prev,
+        [selectedMonth]: {
+           ...prev[selectedMonth],
+           expenses: {
+              ...prev[selectedMonth].expenses,
+              [pharmacyId]: {
+                 ...prev[selectedMonth].expenses[pharmacyId],
+                 [field]: parseFloat(value) || 0
+              }
+           }
+        }
+     }));
+  };
+
+  // CHECK MAPPED COSTS BEFORE APPROVAL
+  const getUnmappedServices = () => {
+     const unmapped: string[] = [];
+     PHARMACIES.forEach(p => {
+        const sales = currentMonthData.privateSales[p.id] || [];
+        sales.forEach(sale => {
+           if (!costs.find(c => c.serviceName === sale.service)) {
+              if (!unmapped.includes(sale.service)) unmapped.push(sale.service);
+           }
+        });
+     });
+     return unmapped;
+  };
+
   const handleStatusChange = (newStatus: BonusStatus) => {
+     if (newStatus === "approved") {
+        const unmapped = getUnmappedServices();
+        if (unmapped.length > 0) {
+           toast({ 
+              title: "Cannot Approve", 
+              description: `Unmapped services found: ${unmapped.join(", ")}. Please add costs first.`, 
+              variant: "destructive" 
+           });
+           setActiveTab("costs");
+           return;
+        }
+     }
+
      setMonthlyData(prev => ({
         ...prev,
         [selectedMonth]: { ...prev[selectedMonth], status: newStatus }
@@ -163,19 +216,25 @@ export default function BonusPerformance() {
   
   const calculatePrivateBonus = (pharmacyId: PharmacyId) => {
      const sales = currentMonthData.privateSales[pharmacyId] || [];
-     let totalProfit = 0;
+     const exp = currentMonthData.expenses[pharmacyId] || DEFAULT_EXPENSES;
+     
+     let grossRevenue = 0;
+     let totalCostOfGoods = 0;
      
      sales.forEach(sale => {
         const costItem = costs.find(c => c.serviceName === sale.service);
         const unitCost = costItem ? costItem.costPrice : 0;
-        const totalCost = unitCost * sale.quantity;
-        const profit = sale.revenue - totalCost;
-        totalProfit += profit;
+        
+        grossRevenue += sale.revenue;
+        totalCostOfGoods += (unitCost * sale.quantity);
      });
 
+     const totalExpenses = exp.googleAds + exp.advertising + exp.other;
+     const netProfit = grossRevenue - totalCostOfGoods - totalExpenses;
+
      // Bonus rule: 10% of profit if > £500 profit
-     if (totalProfit < 500) return 0;
-     return totalProfit * 0.10;
+     if (netProfit < 500) return 0;
+     return netProfit * 0.10;
   };
 
   const calculateNHSBonus = (pharmacyId: PharmacyId) => {
@@ -354,6 +413,7 @@ export default function BonusPerformance() {
               <div className="grid gap-6">
                  {PHARMACIES.map(p => {
                     const sales = currentMonthData.privateSales[p.id] || [];
+                    const exp = currentMonthData.expenses[p.id] || DEFAULT_EXPENSES;
                     return (
                        <Card key={p.id} className="p-6 rounded-2xl border bg-card/60">
                           <div className="flex justify-between items-center mb-4">
@@ -376,6 +436,53 @@ export default function BonusPerformance() {
                              </div>
                           </div>
 
+                          {/* EXPENSES INPUTS */}
+                          <div className="mb-4 p-4 bg-background/50 rounded-xl border">
+                             <div className="text-xs font-semibold uppercase text-muted-foreground mb-3">Monthly Expenses</div>
+                             <div className="grid grid-cols-4 gap-4">
+                                <div>
+                                   <Label className="text-[10px]">Working Days</Label>
+                                   <Input 
+                                      className="h-8 font-mono" 
+                                      type="number"
+                                      value={exp.workingDays}
+                                      onChange={e => handleExpenseChange(p.id, "workingDays", e.target.value)}
+                                      disabled={isLocked}
+                                   />
+                                </div>
+                                <div>
+                                   <Label className="text-[10px]">Google Ads (£)</Label>
+                                   <Input 
+                                      className="h-8 font-mono" 
+                                      type="number"
+                                      value={exp.googleAds}
+                                      onChange={e => handleExpenseChange(p.id, "googleAds", e.target.value)}
+                                      disabled={isLocked}
+                                   />
+                                </div>
+                                <div>
+                                   <Label className="text-[10px]">Advertising (£)</Label>
+                                   <Input 
+                                      className="h-8 font-mono" 
+                                      type="number"
+                                      value={exp.advertising}
+                                      onChange={e => handleExpenseChange(p.id, "advertising", e.target.value)}
+                                      disabled={isLocked}
+                                   />
+                                </div>
+                                <div>
+                                   <Label className="text-[10px]">Other (£)</Label>
+                                   <Input 
+                                      className="h-8 font-mono" 
+                                      type="number"
+                                      value={exp.other}
+                                      onChange={e => handleExpenseChange(p.id, "other", e.target.value)}
+                                      disabled={isLocked}
+                                   />
+                                </div>
+                             </div>
+                          </div>
+
                           {sales.length === 0 ? (
                              <div className="text-center py-8 text-muted-foreground text-sm border-2 border-dashed rounded-xl">
                                 No sales data uploaded for this month.
@@ -389,7 +496,7 @@ export default function BonusPerformance() {
                                          <TableHead className="text-right">Qty</TableHead>
                                          <TableHead className="text-right">Revenue</TableHead>
                                          <TableHead className="text-right">Cost (Est)</TableHead>
-                                         <TableHead className="text-right">Profit</TableHead>
+                                         <TableHead className="text-right">Margin</TableHead>
                                       </TableRow>
                                    </TableHeader>
                                    <TableBody>
@@ -397,14 +504,29 @@ export default function BonusPerformance() {
                                          const costItem = costs.find(c => c.serviceName === sale.service);
                                          const unitCost = costItem ? costItem.costPrice : 0;
                                          const totalCost = unitCost * sale.quantity;
-                                         const profit = sale.revenue - totalCost;
+                                         const margin = sale.revenue - totalCost;
+                                         
+                                         if (!costItem) {
+                                            // Warn unmapped
+                                            return (
+                                               <TableRow key={i} className="bg-destructive/5">
+                                                  <TableCell className="font-medium text-xs text-destructive flex items-center gap-2">
+                                                     <AlertCircle className="h-3 w-3" /> {sale.service}
+                                                  </TableCell>
+                                                  <TableCell className="text-right font-mono text-xs">{sale.quantity}</TableCell>
+                                                  <TableCell className="text-right font-mono text-xs">£{sale.revenue.toFixed(2)}</TableCell>
+                                                  <TableCell colSpan={2} className="text-center text-xs text-destructive">Unmapped Cost</TableCell>
+                                               </TableRow>
+                                            )
+                                         }
+
                                          return (
                                             <TableRow key={i}>
                                                <TableCell className="font-medium text-xs">{sale.service}</TableCell>
                                                <TableCell className="text-right font-mono text-xs">{sale.quantity}</TableCell>
                                                <TableCell className="text-right font-mono text-xs">£{sale.revenue.toFixed(2)}</TableCell>
                                                <TableCell className="text-right font-mono text-xs text-muted-foreground">£{totalCost.toFixed(2)}</TableCell>
-                                               <TableCell className="text-right font-mono text-xs font-bold text-emerald-600">£{profit.toFixed(2)}</TableCell>
+                                               <TableCell className="text-right font-mono text-xs font-bold text-emerald-600">£{margin.toFixed(2)}</TableCell>
                                             </TableRow>
                                          );
                                       })}
@@ -413,17 +535,20 @@ export default function BonusPerformance() {
                              </div>
                           )}
                           
-                          <div className="flex justify-end mt-4 gap-6">
-                             <div className="text-sm">
-                                <span className="text-muted-foreground mr-2">Total Profit:</span>
-                                <span className="font-mono font-bold">
-                                   £{sales.reduce((acc, s) => {
-                                      const costItem = costs.find(c => c.serviceName === s.service);
-                                      return acc + (s.revenue - ((costItem?.costPrice || 0) * s.quantity));
-                                   }, 0).toFixed(2)}
-                                </span>
+                          <div className="flex justify-end mt-4 gap-6 items-center">
+                             <div className="text-xs text-muted-foreground">
+                                Total Expenses: £{(exp.googleAds + exp.advertising + exp.other).toFixed(2)}
                              </div>
                              <div className="text-sm">
+                                <span className="text-muted-foreground mr-2">Net Profit:</span>
+                                <span className="font-mono font-bold">
+                                   £{(sales.reduce((acc, s) => {
+                                      const costItem = costs.find(c => c.serviceName === s.service);
+                                      return acc + (s.revenue - ((costItem?.costPrice || 0) * s.quantity));
+                                   }, 0) - (exp.googleAds + exp.advertising + exp.other)).toFixed(2)}
+                                </span>
+                             </div>
+                             <div className="text-sm border-l pl-6">
                                 <span className="text-muted-foreground mr-2">Calculated Bonus (10%):</span>
                                 <span className="font-mono font-bold text-primary">£{calculatePrivateBonus(p.id).toFixed(2)}</span>
                              </div>
@@ -464,6 +589,23 @@ export default function BonusPerformance() {
                                    onChange={e => handleCostUpdate(cost.id, e.target.value)}
                                    className="h-9 font-mono"
                                 />
+                             </TableCell>
+                          </TableRow>
+                       ))}
+                       {getUnmappedServices().map((name, i) => (
+                          <TableRow key={`unmapped-${i}`} className="bg-destructive/5">
+                             <TableCell className="font-medium text-destructive flex items-center gap-2">
+                                <AlertCircle className="h-4 w-4" /> {name}
+                             </TableCell>
+                             <TableCell>
+                                <Button 
+                                   size="sm" 
+                                   variant="outline" 
+                                   className="h-8 w-full border-destructive text-destructive hover:bg-destructive/10"
+                                   onClick={() => setCosts(prev => [...prev, { id: `c_${Date.now()}`, serviceName: name, costPrice: 0 }])}
+                                >
+                                   Add to List
+                                </Button>
                              </TableCell>
                           </TableRow>
                        ))}
