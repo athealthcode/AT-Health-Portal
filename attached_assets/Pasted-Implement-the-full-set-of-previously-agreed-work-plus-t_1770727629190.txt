@@ -1,0 +1,69 @@
+Implement the full set of previously agreed work plus the new private sales CSV format support.
+
+1) Organise logins and access control (single source of truth)
+- Enforce email accounts and roles:
+  - ahmed@at-health.co.uk = Master (named Ahmed) with Master PIN 145891; Master capabilities and UI only appear when this email is logged in.
+  - info@at-health.co.uk = Head Office Admin only.
+  - finance@at-health.co.uk = shared Finance email login; after email+OTP, show Finance staff picker and require individual staff PIN (4–8 digits) per finance person.
+  - Pharmacy emails can be added later.
+- Add a post-login mode selector for Ahmed and Head Office Admin: "Head Office (all stores)" vs "Pharmacy view" (select store). Persist chosen context until Log out of Branch.
+- Fix logout so it works reliably:
+  - Log out of User = end staff PIN session return to staff picker.
+  - Log out of Branch = end email session return to email login.
+- Ensure session persistence so Back to Dashboard never logs out.
+
+2) Documents per pharmacy
+- Store the provided SharePoint URLs in Settings (Head Office only) and use them in Documents:
+  - Bowland: https://athealth.sharepoint.com/sites/bowland/Shared%20Documents/Forms/AllItems.aspx
+  - Denton: https://athealth.sharepoint.com/sites/denton/Shared%20Documents/Forms/AllItems.aspx
+  - Wilmslow: https://athealth.sharepoint.com/sites/wilmslow/Shared%20Documents/Forms/AllItems.aspx
+- In Head Office mode allow selecting a pharmacy and opening its link.
+
+3) Daily Figures and Cashing Up (carry forward previously agreed behaviour)
+- Blank required fields (staff must type 0 when applicable).
+- One submission per pharmacy per trading day; read-only summary if already submitted.
+- Confirmation page shows "Submission complete" and summary of ALL values entered; includes Enter another day.
+- Add Raise a problem ticketing that emails Head Office and stores ticket with audit.
+- Fix currency inputs: allow typing decimals like 9.90; format to £0.00 after blur; multiples-of-£9.90 validation for NHS Prepayment and FP57 Refund must accept valid decimal entry.
+
+4) Bookkeeping checklist
+- Ensure the template includes every heading/task exactly as specified by the checklist list (Main Wholesalers, Sales, Others, MYS & In House and all items) and fix missing tasks.
+- Implement Save and lock for a month: ticking is draft until saved; after save+lock month becomes read-only for pharmacy users; Head Office can unlock.
+- Fix UI overflow by wrapping and expanding without clipping.
+
+5) Reports (detailed, multi-pharmacy)
+- Reports landing has sections: Figures Report, Cashing Up Report, Audit Report.
+- Provide multiple report types per section (MTD summary, daily breakdown, EPS vs Paper, Paid vs Exempt, services performance, month vs previous month, VAT summary, pay-outs, variance days, logins, edits, deletions, raise-a-problem tickets).
+- Add ability to select one, multiple, or all pharmacies.
+- Audit log filters: pharmacy, head office, all; retain indefinitely.
+
+6) Bonus & Performance (head office only)
+- Implement Bonus & Performance module with Draft → Approved → Locked workflow, monthly per-pharmacy NHS Bonus and Private Bonus.
+- Gates are mandatory; overrides require reason and are audited.
+- Rolling 6-month averages computed from portal data (user will provide historic data).
+- Private sales monthly file upload: support the exact CSV export format uploaded (ProductSoldHistoryReport_*.csv). Parse robustly and extract description, quantity, sale amount, date.
+- Cost catalogue:
+  - Import ALL costs from the user-provided list and merge duplicates into one cost item.
+  - Create a one-page editable Costs screen (Head Office editable) with all cost items.
+  - Treat blank costs as £0.00 but still include the item.
+- Cost mapping:
+  - Build mapping between sales Description values and cost catalogue items.
+  - Block Approve if any sales description is unmapped.
+- Monthly expenses inputs per pharmacy per month: Working days, Google Ads, Advertising, and Other line items.
+- Private profit calculation per month:
+  - Revenue = sale amount from file.
+  - Total cost = quantity x mapped unit cost.
+  - Profit = revenue - total cost - expenses.
+  - Private bonus computed from profit per the agreed structure.
+- Provide consolidated all-pharmacy view and per-pharmacy view, and month vs previous month comparisons.
+- Exports CSV and PDF.
+
+7) Deletion safeguards
+- Branch deletion: only Ahmed can perform; requires Master PIN 145891, triple confirmation; audit log.
+- User deletion: only Head Office Admin and Ahmed; confirmations; audit log; send email confirmation to info@at-health.co.uk.
+- Fix Master PIN check bug so it works.
+
+8) Branding
+- Ensure logo is included as a project asset and displayed on login and sidebar; maintain blue/white theme with readable hover states.
+
+Implement all changes without rewriting the entire app, but ensure persistence and server-side enforcement for auth, roles, PINs, deletion safeguards, audit logs, and bonus data.
