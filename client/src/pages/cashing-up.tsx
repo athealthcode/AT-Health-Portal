@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { AlertCircle, Calendar, CheckCircle2, ArrowLeft, ArrowRight, Lock, MessageSquareWarning } from "lucide-react";
+import { AlertCircle, Calendar, CheckCircle2, ArrowLeft, ArrowRight, Lock, Edit2, FileCheck, Landmark } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { format } from "date-fns";
@@ -16,10 +16,11 @@ import { useAuth } from "@/state/auth";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useLocation } from "wouter";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 
 function normalizeMoney(v: string) {
   if (v === "") return "";
-  // Relaxed: just strip illegal, keep dot
   return v.replace(/[^0-9.]/g, "");
 }
 
@@ -33,11 +34,28 @@ export default function CashingUp() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { session } = useAuth();
-  const { isSubmitted, markSubmitted } = useSubmittedDays("cashing-up");
 
   const [date, setDate] = useState<Date | undefined>(new Date());
-  const [view, setView] = useState<"form" | "summary">("form");
-  const [lastSubmitted, setLastSubmitted] = useState<{ inputs: any, payouts: any } | null>(null);
+  
+  // Custom mock data for historical view
+  const formattedDate = date ? format(date, "yyyy-MM-dd") : "";
+  const [submittedData, setSubmittedData] = useState<Record<string, any>>({
+     "2026-03-01": { 
+        user: "John Smith", 
+        timestamp: new Date().getTime() - 86400000, 
+        inputs: { vatStandard: "120.00", vatExempt: "0.00", vatZero: "50.00", vatLow: "0.00", vatNone: "0.00", toBeBanked: "50.00", readingCard: "120.00", userVariance: "0.00" },
+        payouts: [{ id: "1", type: "locum", label: "Dr Sarah", amount: "250.00", invoiceUploaded: true }],
+        banking: [{ id: "b1", amount: "500.00", location: "Barclays High St" }]
+     }
+  });
+
+  const existingRecord = submittedData[formattedDate];
+  const isHeadOffice = session.scope.type === "headoffice";
+  const [isEditingMode, setIsEditingMode] = useState(!existingRecord);
+
+  useEffect(() => {
+     setIsEditingMode(!submittedData[formattedDate] || isHeadOffice);
+  }, [formattedDate, submittedData, isHeadOffice]);
   
   const [inputs, setInputs] = useState<Record<string, string | number>>({
     toBeBanked: "",
@@ -46,33 +64,58 @@ export default function CashingUp() {
     vatExempt: "",
     vatZero: "",
     vatLow: "",
-    userVariance: "", // Staff entered variance check
+    vatNone: "", // New Field
+    userVariance: "", 
   });
 
-  const [payouts, setPayouts] = useState<Array<{ id: string; label: string; amount: string | number }>>([
-    { id: "p1", label: "", amount: "" },
+  const [payouts, setPayouts] = useState<Array<{ id: string; type: string; label: string; amount: string | number; location?: string; invoiceUploaded?: boolean }>>([
+    { id: "p1", type: "expense", label: "", amount: "" },
   ]);
+  
+  const [banking, setBanking] = useState<Array<{ id: string; amount: string | number; location: string }>>([]);
 
-  const [highlightMissing, setHighlightMissing] = useState(false);
-  const [varianceError, setVarianceError] = useState(false);
+  // Load existing data
+  useEffect(() => {
+     if (existingRecord && existingRecord.inputs) {
+        setInputs({
+           toBeBanked: "", readingCard: "", vatStandard: "", vatExempt: "", vatZero: "", vatLow: "", vatNone: "", userVariance: "", 
+           ...existingRecord.inputs 
+        });
+        setPayouts(existingRecord.payouts || [{ id: "p1", type: "expense", label: "", amount: "" }]);
+        setBanking(existingRecord.banking || []);
+     } else {
+        setInputs({
+           toBeBanked: "", readingCard: "", vatStandard: "", vatExempt: "", vatZero: "", vatLow: "", vatNone: "", userVariance: "", 
+        });
+        setPayouts([{ id: "p1", type: "expense", label: "", amount: "" }]);
+        setBanking([]);
+     }
+  }, [formattedDate, existingRecord]);
 
-  // Problem Report State
-  const [reportOpen, setReportOpen] = useState(false);
-  const [problemMessage, setProblemMessage] = useState("");
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [globalError, setGlobalError] = useState<string | null>(null);
 
-  const formattedDate = date ? format(date, "yyyy-MM-dd") : "";
-  const submissionRecord = useMemo(() => isSubmitted(formattedDate), [formattedDate, isSubmitted]);
+  const [notCompletedReason, setNotCompletedReason] = useState("");
+  const [notCompletedOpen, setNotCompletedOpen] = useState(false);
 
   // System Calculations
   const totalPayouts = useMemo(() => payouts.reduce((a, p) => a + (Number(p.amount) || 0), 0), [payouts]);
-  const grossTaking = (Number(inputs.vatStandard)||0) + (Number(inputs.vatExempt)||0) + (Number(inputs.vatZero)||0) + (Number(inputs.vatLow)||0);
+  const totalBanking = useMemo(() => banking.reduce((a, b) => a + (Number(b.amount) || 0), 0), [banking]);
+  
+  const grossTaking = (Number(inputs.vatStandard)||0) + (Number(inputs.vatExempt)||0) + (Number(inputs.vatZero)||0) + (Number(inputs.vatLow)||0) + (Number(inputs.vatNone)||0);
   const actualTaking = (Number(inputs.toBeBanked)||0) + (Number(inputs.readingCard)||0) + totalPayouts;
   const systemVariance = Math.round((grossTaking - actualTaking) * 100) / 100;
   
+  // Mock Store Cash Logic
+  const initialStoreCash = 1250.00;
+  const storeCashAfterDay = initialStoreCash + (Number(inputs.toBeBanked)||0) - totalBanking;
+
   const updateInput = (key: keyof typeof inputs, val: string) => {
     setInputs(prev => ({ ...prev, [key]: normalizeMoney(val) }));
-    setHighlightMissing(false);
-    setVarianceError(false); 
+    if (validationErrors[key]) {
+       setValidationErrors(prev => { const n = {...prev}; delete n[key]; return n; });
+    }
+    setGlobalError(null);
   };
 
   const handleBlur = (key: keyof typeof inputs) => {
@@ -84,7 +127,7 @@ export default function CashingUp() {
      }
   };
 
-  const handlePayoutChange = (id: string, field: "label" | "amount", value: string) => {
+  const handlePayoutChange = (id: string, field: string, value: any) => {
      setPayouts(s => s.map(p => p.id === id ? { ...p, [field]: field === "amount" ? normalizeMoney(value) : value } : p));
   };
 
@@ -98,173 +141,96 @@ export default function CashingUp() {
      }));
   };
 
-  const handleSubmit = () => {
-    if (!date) {
-      toast({ title: "Date Required", description: "Please select a trading date.", variant: "destructive" });
-      return;
-    }
+  const validate = () => {
+    const errors: Record<string, string> = {};
+    let hasMissing = false;
 
-    // Validation: All fields required
-    const missing = Object.values(inputs).some(v => v === "");
-    if (missing) {
-       setHighlightMissing(true);
-       toast({ title: "Missing Fields", description: "All fields are required. Enter 0 if not applicable.", variant: "destructive" });
-       return;
-    }
+    if (!date) return { global: "Date is required.", errors };
 
-    // Variance check
-    const userVar = Number(inputs.userVariance);
-    if (Math.abs(userVar - systemVariance) > 0.01) {
-       setVarianceError(true);
-       toast({ title: "Variance Mismatch", description: "Your calculated variance does not match the system.", variant: "destructive" });
-       return;
-    }
-
-    markSubmitted(formattedDate, session.staff?.name || "Unknown");
-    setLastSubmitted({ inputs, payouts });
-    setView("summary");
-    
-    // Reset
-    setInputs({
-      toBeBanked: "",
-      readingCard: "",
-      vatStandard: "",
-      vatExempt: "",
-      vatZero: "",
-      vatLow: "",
-      userVariance: "",
+    // Require explicit 0s for all core input fields
+    Object.keys(inputs).forEach(k => {
+       if (inputs[k as keyof typeof inputs] === "") {
+          errors[k] = "Required. Enter 0 if none.";
+          hasMissing = true;
+       }
     });
-    setPayouts([{ id: "p1", label: "", amount: "" }]);
-    setHighlightMissing(false);
-    toast({ title: "Submitted", description: `Cashing up saved for ${format(date, "PPP")}.` });
+
+    // Payout Validations
+    payouts.forEach((p, i) => {
+       if (p.amount !== "" && Number(p.amount) > 0) {
+          if (!p.label) errors[`payout_${i}_label`] = "Detail required";
+          if (p.type === "locum" && !p.invoiceUploaded) {
+             errors[`payout_${i}_invoice`] = "Invoice confirmation required for locum payouts";
+          }
+       }
+    });
+    
+    // Banking Validations
+    banking.forEach((b, i) => {
+       if (b.amount !== "" && Number(b.amount) > 0 && !b.location) {
+          errors[`banking_${i}_location`] = "Bank location required";
+       }
+    });
+
+    // Variance Check
+    const userVar = Number(inputs.userVariance || 0);
+    if (Math.abs(userVar - systemVariance) > 0.01) {
+       errors["userVariance"] = "Does not match calculated system variance";
+    }
+
+    if (hasMissing) {
+       return { global: "Missing fields. Ensure all input fields have a value (0).", errors };
+    }
+
+    if (Object.keys(errors).length > 0) {
+       return { global: "Please fix the highlighted errors.", errors };
+    }
+
+    return { global: null, errors: {} };
   };
 
-  const handleRaiseProblem = () => {
-     toast({ title: "Problem Reported", description: "Head Office has been notified." });
-     setReportOpen(false);
-     setProblemMessage("");
+  const handleSubmit = () => {
+    const { global, errors } = validate();
+    
+    if (global || Object.keys(errors).length > 0) {
+       setValidationErrors(errors);
+       setGlobalError(global);
+       toast({ title: "Validation Error", description: global || "Fix errors below.", variant: "destructive" });
+       return;
+    }
+
+    setSubmittedData(prev => ({
+       ...prev,
+       [formattedDate]: {
+          user: session.staff?.name || session.userEmail || "Unknown",
+          timestamp: Date.now(),
+          inputs: { ...inputs },
+          payouts: [...payouts],
+          banking: [...banking],
+       }
+    }));
+    
+    setIsEditingMode(false);
+    toast({ title: "Submitted", description: `Cashing up saved for ${format(date!, "PPP")}.` });
   };
 
-  // Submission Blocked View
-  if (submissionRecord && view === "form" && !lastSubmitted) {
-     return (
-        <AppShell>
-           <div className="flex flex-col gap-6 max-w-3xl mx-auto mt-10">
-              <div className="flex items-center gap-4">
-                 <Button variant="ghost" onClick={() => window.history.back()}>
-                    <ArrowLeft className="h-4 w-4 mr-2" /> Back
-                 </Button>
-                 <h1 className="font-serif text-2xl">Cashing Up</h1>
-              </div>
-
-              <Card className="p-8 border-l-4 border-l-blue-500 bg-blue-50/50">
-                 <div className="flex items-start gap-4">
-                    <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
-                       <Lock className="h-6 w-6" />
-                    </div>
-                    <div className="space-y-2 flex-1">
-                       <h2 className="text-lg font-semibold text-blue-900">Already Submitted</h2>
-                       <p className="text-blue-800/80">
-                          Cashing up for <span className="font-medium">{format(date!, "PPP")}</span> was already submitted by <span className="font-medium">{submissionRecord.user}</span> on {new Date(submissionRecord.timestamp).toLocaleTimeString()}.
-                       </p>
-                       <p className="text-sm text-blue-800/60">
-                          Only one submission is allowed per trading day.
-                       </p>
-                    </div>
-                 </div>
-                 
-                 <div className="mt-6 flex gap-3">
-                    <Dialog open={reportOpen} onOpenChange={setReportOpen}>
-                       <DialogTrigger asChild>
-                          <Button variant="outline" className="text-destructive hover:text-destructive border-destructive/20 hover:bg-destructive/5">
-                             <MessageSquareWarning className="h-4 w-4 mr-2" />
-                             Raise a problem
-                          </Button>
-                       </DialogTrigger>
-                       <DialogContent>
-                          <DialogHeader>
-                             <DialogTitle>Raise a Problem</DialogTitle>
-                             <DialogDescription>
-                                Describe the issue. Head Office will be notified.
-                             </DialogDescription>
-                          </DialogHeader>
-                          <div className="space-y-4 py-4">
-                             <div className="grid gap-2">
-                                <Label>Message</Label>
-                                <Textarea 
-                                   value={problemMessage} 
-                                   onChange={e => setProblemMessage(e.target.value)} 
-                                   placeholder="e.g. Needs correction..."
-                                />
-                             </div>
-                          </div>
-                          <DialogFooter>
-                             <Button onClick={handleRaiseProblem}>Send Report</Button>
-                          </DialogFooter>
-                       </DialogContent>
-                    </Dialog>
-                    
-                    <Button variant="secondary" onClick={() => setDate(new Date())}>
-                       Select Different Date
-                    </Button>
-                 </div>
-              </Card>
-           </div>
-        </AppShell>
-     );
-  }
-
-  // Summary View
-  if (view === "summary" && lastSubmitted) {
-     return (
-        <AppShell>
-           <div className="flex flex-col gap-6 max-w-2xl mx-auto items-center justify-center min-h-[60vh]">
-              <div className="h-20 w-20 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-4">
-                 <CheckCircle2 className="h-10 w-10" />
-              </div>
-              <div className="text-center space-y-2">
-                 <h2 className="text-3xl font-semibold tracking-tight">Submission Complete</h2>
-                 <p className="text-muted-foreground">
-                    Cashing up for <span className="font-medium text-foreground">{date ? format(date, "PPP") : "Unknown Date"}</span> has been recorded.
-                 </p>
-              </div>
-
-              <Card className="w-full p-6 mt-4 bg-card/60">
-                 <h3 className="text-sm font-semibold mb-4 uppercase tracking-wider text-muted-foreground">Summary</h3>
-                 <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div className="flex justify-between border-b pb-2">
-                       <span>Gross Taking</span>
-                       <span className="font-mono font-medium">
-                          {formatCurrency((Number(lastSubmitted.inputs.vatStandard)||0) + (Number(lastSubmitted.inputs.vatExempt)||0) + (Number(lastSubmitted.inputs.vatZero)||0) + (Number(lastSubmitted.inputs.vatLow)||0))}
-                       </span>
-                    </div>
-                    <div className="flex justify-between border-b pb-2">
-                       <span>Banked Cash</span>
-                       <span className="font-mono font-medium">{formatCurrency(lastSubmitted.inputs.toBeBanked)}</span>
-                    </div>
-                    <div className="flex justify-between border-b pb-2">
-                       <span>Card Total</span>
-                       <span className="font-mono font-medium">{formatCurrency(lastSubmitted.inputs.readingCard)}</span>
-                    </div>
-                    <div className="flex justify-between border-b pb-2">
-                       <span>Payouts Count</span>
-                       <span className="font-mono font-medium">{lastSubmitted.payouts.length}</span>
-                    </div>
-                 </div>
-              </Card>
-
-              <div className="flex gap-4 w-full">
-                 <Button variant="outline" className="flex-1 h-12" onClick={() => setLocation("/")}>
-                    <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
-                 </Button>
-                 <Button className="flex-1 h-12" onClick={() => { setView("form"); setLastSubmitted(null); setDate(undefined); }}>
-                    Enter Another Day <ArrowRight className="ml-2 h-4 w-4" />
-                 </Button>
-              </div>
-           </div>
-        </AppShell>
-     );
-  }
+  const handleMarkNotCompleted = () => {
+     if (!notCompletedReason) return;
+     
+     setSubmittedData(prev => ({
+        ...prev,
+        [formattedDate]: {
+           user: session.staff?.name || session.userEmail || "Unknown",
+           timestamp: Date.now(),
+           status: "not_completed",
+           reason: notCompletedReason,
+        }
+     }));
+     
+     setNotCompletedOpen(false);
+     setIsEditingMode(false);
+     toast({ title: "Status Updated", description: "Marked as not completed." });
+  };
 
   return (
     <AppShell>
@@ -272,194 +238,264 @@ export default function CashingUp() {
         <div>
           <div className="font-serif text-2xl tracking-tight" data-testid="text-cashing-up-title">Cashing Up</div>
           <div className="text-sm text-muted-foreground" data-testid="text-cashing-up-subtitle">
-            Enter daily trading figures. Month-to-date reports available in Reporting.
+            Enter daily trading figures. Explicit 0 required for all fields.
           </div>
         </div>
 
-        <div className="grid gap-3 lg:grid-cols-[1fr_360px]">
-          <Card className="rounded-2xl border bg-card/60 p-5" data-testid="card-cashing-up-form">
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div className="text-sm font-semibold">Inputs</div>
-              
-              <div className="flex items-center gap-2">
-                 <Label className="text-xs text-muted-foreground uppercase tracking-wider">Trading Day:</Label>
-                 <Popover>
-                    <PopoverTrigger asChild>
-                       <Button
-                          variant="outline"
-                          className={`w-[200px] justify-start text-left font-normal ${!date && "text-muted-foreground"}`}
-                       >
-                          <Calendar className="mr-2 h-4 w-4" />
-                          {date ? format(date, "PPP") : <span>Pick a date</span>}
-                       </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="end">
-                       <CalendarComponent
-                          mode="single"
-                          selected={date}
-                          onSelect={setDate}
-                          initialFocus
-                       />
-                    </PopoverContent>
-                 </Popover>
-              </div>
-            </div>
-
-            <Separator className="my-4" />
-
-            <div className="grid gap-6 md:grid-cols-2">
-              {/* VAT BUCKETS (GROSS) */}
-              <div className="space-y-4 rounded-xl border bg-background/40 p-4 md:col-span-2">
-                 <div className="text-xs font-semibold text-muted-foreground uppercase">VAT Analysis (Gross Components)</div>
-                 <div className="grid gap-4 sm:grid-cols-4">
-                    <div>
-                      <Label className="text-xs">Standard (20%)</Label>
-                      <div className="relative mt-1">
-                         <span className="absolute left-3 top-2.5 text-xs text-muted-foreground">£</span>
-                         <Input 
-                            className={`pl-6 h-10 font-mono ${highlightMissing && inputs.vatStandard === "" ? "border-destructive ring-destructive/20" : ""}`} 
-                            value={inputs.vatStandard} 
-                            onChange={e => updateInput("vatStandard", e.target.value)} 
-                            onBlur={() => handleBlur("vatStandard")}
-                            placeholder="0.00"
-                         />
-                      </div>
-                    </div>
-                    <div>
-                      <Label className="text-xs">Exempt</Label>
-                      <div className="relative mt-1">
-                         <span className="absolute left-3 top-2.5 text-xs text-muted-foreground">£</span>
-                         <Input 
-                            className={`pl-6 h-10 font-mono ${highlightMissing && inputs.vatExempt === "" ? "border-destructive ring-destructive/20" : ""}`} 
-                            value={inputs.vatExempt} 
-                            onChange={e => updateInput("vatExempt", e.target.value)} 
-                            onBlur={() => handleBlur("vatExempt")}
-                            placeholder="0.00"
-                         />
-                      </div>
-                    </div>
-                    <div>
-                      <Label className="text-xs">Zero</Label>
-                      <div className="relative mt-1">
-                         <span className="absolute left-3 top-2.5 text-xs text-muted-foreground">£</span>
-                         <Input 
-                            className={`pl-6 h-10 font-mono ${highlightMissing && inputs.vatZero === "" ? "border-destructive ring-destructive/20" : ""}`} 
-                            value={inputs.vatZero} 
-                            onChange={e => updateInput("vatZero", e.target.value)} 
-                            onBlur={() => handleBlur("vatZero")}
-                            placeholder="0.00"
-                         />
-                      </div>
-                    </div>
-                    <div>
-                      <Label className="text-xs">5% VAT</Label>
-                      <div className="relative mt-1">
-                         <span className="absolute left-3 top-2.5 text-xs text-muted-foreground">£</span>
-                         <Input 
-                            className={`pl-6 h-10 font-mono ${highlightMissing && inputs.vatLow === "" ? "border-destructive ring-destructive/20" : ""}`} 
-                            value={inputs.vatLow} 
-                            onChange={e => updateInput("vatLow", e.target.value)} 
-                            onBlur={() => handleBlur("vatLow")}
-                            placeholder="0.00"
-                         />
-                      </div>
-                    </div>
-                 </div>
-                 <div className="text-right text-sm font-medium">Gross Taking: {formatCurrency(grossTaking)}</div>
-              </div>
-
-              {/* ACTUAL COMPONENTS */}
-              <div className="rounded-xl border bg-background/40 p-4">
-                 <Label className="text-sm">To Be Banked</Label>
-                 <div className="relative mt-2">
-                    <span className="absolute left-3 top-3 text-xs text-muted-foreground">£</span>
-                    <Input 
-                       className={`pl-6 h-11 font-mono ${highlightMissing && inputs.toBeBanked === "" ? "border-destructive ring-destructive/20" : ""}`} 
-                       value={inputs.toBeBanked} 
-                       onChange={e => updateInput("toBeBanked", e.target.value)} 
-                       onBlur={() => handleBlur("toBeBanked")}
-                       placeholder="0.00"
-                    />
-                 </div>
-              </div>
-
-              <div className="rounded-xl border bg-background/40 p-4">
-                 <Label className="text-sm">Reading Card</Label>
-                 <div className="relative mt-2">
-                    <span className="absolute left-3 top-3 text-xs text-muted-foreground">£</span>
-                    <Input 
-                       className={`pl-6 h-11 font-mono ${highlightMissing && inputs.readingCard === "" ? "border-destructive ring-destructive/20" : ""}`} 
-                       value={inputs.readingCard} 
-                       onChange={e => updateInput("readingCard", e.target.value)} 
-                       onBlur={() => handleBlur("readingCard")}
-                       placeholder="0.00"
-                    />
-                 </div>
-              </div>
-
-              {/* PAYOUTS */}
-              <div className="rounded-xl border bg-background/40 p-4 md:col-span-2">
-                <div className="flex justify-between items-center mb-2">
-                   <Label className="text-sm">Pay Outs</Label>
-                   <span className="text-xs text-muted-foreground">Total: {formatCurrency(totalPayouts)}</span>
+        <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
+          <div className="space-y-4">
+             {/* HEADER STRIP */}
+             <Card className={`p-4 flex items-center gap-4 border shadow-sm ${existingRecord ? (existingRecord.status === 'not_completed' ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200') : 'bg-primary/5 border-primary/20'}`}>
+                <div className={`h-10 w-10 rounded-full flex items-center justify-center shrink-0 ${existingRecord ? (existingRecord.status === 'not_completed' ? 'bg-amber-100 text-amber-600' : 'bg-emerald-100 text-emerald-600') : 'bg-primary/10 text-primary'}`}>
+                   {existingRecord ? <CheckCircle2 className="h-5 w-5" /> : <Calendar className="h-5 w-5" />}
                 </div>
-                <div className="space-y-2">
-                  {payouts.map((p) => (
-                    <div key={p.id} className="flex gap-2">
-                      <Input placeholder="Detail" value={p.label} onChange={e => handlePayoutChange(p.id, "label", e.target.value)} className="h-10" />
-                      <div className="relative w-32">
-                         <span className="absolute left-3 top-2.5 text-xs text-muted-foreground">£</span>
-                         <Input 
-                            placeholder="0.00" 
-                            value={p.amount} 
-                            onChange={e => handlePayoutChange(p.id, "amount", e.target.value)} 
-                            onBlur={() => handlePayoutBlur(p.id)}
-                            className="pl-6 h-10 font-mono" 
-                         />
-                      </div>
-                      <Button variant="ghost" size="icon" onClick={() => setPayouts(s => s.filter(x => x.id !== p.id))} disabled={payouts.length === 1}>×</Button>
-                    </div>
-                  ))}
-                  <Button variant="secondary" size="sm" onClick={() => setPayouts(s => [...s, {id: Date.now().toString(), label: "", amount: ""}])}>Add Payout</Button>
+                <div className="flex-1">
+                   <div className="text-sm font-medium flex items-center gap-2">
+                      Trading Date
+                      {existingRecord ? (
+                         <Badge variant="outline" className={`h-5 text-[10px] ${existingRecord.status === 'not_completed' ? 'border-amber-500 text-amber-600' : 'border-emerald-500 text-emerald-600'}`}>
+                            {existingRecord.status === 'not_completed' ? 'Not Completed' : 'Entered'}
+                         </Badge>
+                      ) : (
+                         <Badge variant="outline" className="h-5 text-[10px] border-red-500 text-red-600">Not Entered</Badge>
+                      )}
+                   </div>
+                   <div className="text-xs text-muted-foreground mt-0.5">
+                      {existingRecord 
+                         ? `Last updated by ${existingRecord.user}` 
+                         : "Ensure this matches the day you are reporting for."}
+                   </div>
                 </div>
-              </div>
+                
+                <div className="flex items-center gap-2">
+                   <Popover>
+                      <PopoverTrigger asChild>
+                         <Button variant="outline" className="w-[180px] justify-start text-left font-normal bg-background">
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {date ? format(date, "PPP") : <span>Pick a date</span>}
+                         </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="end">
+                         <CalendarComponent mode="single" selected={date} onSelect={setDate} initialFocus />
+                      </PopoverContent>
+                   </Popover>
 
-              {/* VARIANCE CHECK */}
-              <div className={`rounded-xl border p-4 md:col-span-2 ${varianceError ? 'border-destructive/50 bg-destructive/5' : 'bg-background/40'}`}>
-                 <Label className="text-sm">Cash Up Variance (Double Check)</Label>
-                 <div className="text-xs text-muted-foreground mb-2">Please calculate the variance manually and enter it here to verify.</div>
-                 <div className="relative">
-                    <span className="absolute left-3 top-3 text-xs text-muted-foreground">£</span>
-                    <Input 
-                       className={`pl-6 h-11 font-mono ${highlightMissing && inputs.userVariance === "" ? "border-destructive ring-destructive/20" : ""}`} 
-                       value={inputs.userVariance} 
-                       onChange={e => updateInput("userVariance", e.target.value)} 
-                       onBlur={() => handleBlur("userVariance")}
-                       placeholder="0.00"
-                    />
-                 </div>
-                 {varianceError && (
-                    <div className="flex items-center gap-2 mt-2 text-sm text-destructive font-medium">
-                       <AlertCircle className="h-4 w-4" />
-                       Mismatch. Please check your entries.
-                    </div>
-                 )}
-              </div>
-            </div>
+                   {(session.role === "Pharmacy Manager" || isHeadOffice) && !existingRecord && (
+                      <Dialog open={notCompletedOpen} onOpenChange={setNotCompletedOpen}>
+                         <DialogTrigger asChild>
+                            <Button variant="outline" className="text-amber-600 border-amber-200 hover:bg-amber-50">
+                               Mark Not Completed
+                            </Button>
+                         </DialogTrigger>
+                         <DialogContent>
+                            <DialogHeader>
+                               <DialogTitle>Mark Day as Not Completed</DialogTitle>
+                            </DialogHeader>
+                            <div className="py-4">
+                               <Label>Reason</Label>
+                               <Textarea value={notCompletedReason} onChange={e => setNotCompletedReason(e.target.value)} className="mt-2" />
+                            </div>
+                            <DialogFooter>
+                               <Button onClick={handleMarkNotCompleted}>Confirm & Save</Button>
+                            </DialogFooter>
+                         </DialogContent>
+                      </Dialog>
+                   )}
+                </div>
+             </Card>
 
-            <div className="mt-6 flex gap-2">
-              <Button 
-                className="h-11 w-full" 
-                disabled={varianceError || !date}
-                onClick={handleSubmit}
-              >
-                Submit Cashing Up
-              </Button>
-            </div>
-          </Card>
+             {globalError && (
+                <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm p-3 rounded-lg flex items-center gap-2">
+                   <AlertCircle className="h-4 w-4 shrink-0" /> {globalError}
+                </div>
+             )}
 
-          <div className="grid gap-3">
-             <Card className="rounded-2xl border bg-card/60 p-5">
+             {existingRecord && existingRecord.status === 'not_completed' ? (
+                <Card className="p-8 text-center border-dashed bg-muted/30">
+                   <AlertCircle className="h-10 w-10 text-amber-500 mx-auto mb-3" />
+                   <h3 className="font-semibold text-lg">Marked as Not Completed</h3>
+                   <p className="text-muted-foreground mt-1">{existingRecord.reason}</p>
+                   {isHeadOffice && (
+                      <Button variant="outline" className="mt-4" onClick={() => setIsEditingMode(true)}>
+                         <Edit2 className="h-4 w-4 mr-2" /> Override & Enter Data
+                      </Button>
+                   )}
+                </Card>
+             ) : (
+                <div className={!isEditingMode ? "pointer-events-none opacity-80 space-y-4" : "space-y-4"}>
+                  {!isEditingMode && !isHeadOffice && (
+                     <div className="bg-blue-50 border border-blue-200 text-blue-800 p-3 rounded-xl flex items-center gap-3 text-sm">
+                        <Lock className="h-4 w-4 shrink-0" /> Figures have been submitted for this date and are view-only.
+                     </div>
+                  )}
+
+                  <Card className="rounded-2xl border bg-card/60 p-5 shadow-sm">
+                     <div className="text-sm font-semibold mb-4">VAT Analysis (Gross Components)</div>
+                     <div className="grid gap-4 sm:grid-cols-5">
+                        {["Standard", "Exempt", "Zero", "Low", "None"].map(v => {
+                           const key = `vat${v}` as keyof typeof inputs;
+                           return (
+                              <div key={key} className="space-y-1 relative">
+                                 <Label className="text-xs">{v === "Standard" ? "Standard (20%)" : v === "Low" ? "5% VAT" : v === "None" ? "No VAT" : v}</Label>
+                                 <div className="relative">
+                                    <span className="absolute left-3 top-2.5 text-xs text-muted-foreground">£</span>
+                                    <Input 
+                                       className={`pl-6 h-10 font-mono ${validationErrors[key] ? "border-destructive ring-destructive/20" : ""}`}
+                                       value={inputs[key]} onChange={e => updateInput(key, e.target.value)} onBlur={() => handleBlur(key)}
+                                       readOnly={!isEditingMode}
+                                    />
+                                 </div>
+                                 {validationErrors[key] && <div className="text-[10px] text-destructive leading-tight absolute -bottom-4">{validationErrors[key]}</div>}
+                              </div>
+                           )
+                        })}
+                     </div>
+                  </Card>
+
+                  <div className="grid md:grid-cols-2 gap-4">
+                     <Card className="rounded-2xl border bg-card/60 p-5 shadow-sm">
+                        <div className="space-y-1 relative">
+                           <Label className="text-sm font-semibold">To Be Banked (Cash)</Label>
+                           <div className="relative mt-2">
+                              <span className="absolute left-3 top-3 text-xs text-muted-foreground">£</span>
+                              <Input 
+                                 className={`pl-6 h-11 font-mono ${validationErrors["toBeBanked"] ? "border-destructive ring-destructive/20" : ""}`}
+                                 value={inputs.toBeBanked} onChange={e => updateInput("toBeBanked", e.target.value)} onBlur={() => handleBlur("toBeBanked")}
+                                 readOnly={!isEditingMode}
+                              />
+                           </div>
+                           {validationErrors["toBeBanked"] && <div className="text-[10px] text-destructive absolute -bottom-4">{validationErrors["toBeBanked"]}</div>}
+                        </div>
+                     </Card>
+                     
+                     <Card className="rounded-2xl border bg-card/60 p-5 shadow-sm">
+                        <div className="space-y-1 relative">
+                           <Label className="text-sm font-semibold">Reading Card</Label>
+                           <div className="relative mt-2">
+                              <span className="absolute left-3 top-3 text-xs text-muted-foreground">£</span>
+                              <Input 
+                                 className={`pl-6 h-11 font-mono ${validationErrors["readingCard"] ? "border-destructive ring-destructive/20" : ""}`}
+                                 value={inputs.readingCard} onChange={e => updateInput("readingCard", e.target.value)} onBlur={() => handleBlur("readingCard")}
+                                 readOnly={!isEditingMode}
+                              />
+                           </div>
+                           {validationErrors["readingCard"] && <div className="text-[10px] text-destructive absolute -bottom-4">{validationErrors["readingCard"]}</div>}
+                        </div>
+                     </Card>
+                  </div>
+
+                  {/* PAYOUTS & BANKING */}
+                  <Card className="rounded-2xl border bg-card/60 p-5 shadow-sm">
+                     <div className="flex justify-between items-center mb-4">
+                        <Label className="text-sm font-semibold">Pay Outs & Banking</Label>
+                     </div>
+                     
+                     <div className="space-y-6">
+                        <div className="space-y-3">
+                           <div className="text-xs font-semibold text-muted-foreground uppercase">Till Payouts</div>
+                           {payouts.map((p, i) => (
+                             <div key={p.id} className="bg-background/50 p-3 rounded-xl border flex flex-col gap-3">
+                               <div className="flex gap-2 items-start">
+                                 <Select disabled={!isEditingMode} value={p.type} onValueChange={v => handlePayoutChange(p.id, "type", v)}>
+                                    <SelectTrigger className="w-[120px]"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                       <SelectItem value="expense">Expense</SelectItem>
+                                       <SelectItem value="locum">Locum Payout</SelectItem>
+                                    </SelectContent>
+                                 </Select>
+                                 
+                                 <div className="flex-1 space-y-1">
+                                    <Input placeholder={p.type === 'locum' ? "Locum Full Name" : "Detail"} value={p.label} onChange={e => handlePayoutChange(p.id, "label", e.target.value)} className={validationErrors[`payout_${i}_label`] ? "border-destructive" : ""} readOnly={!isEditingMode} />
+                                    {validationErrors[`payout_${i}_label`] && <div className="text-[10px] text-destructive">{validationErrors[`payout_${i}_label`]}</div>}
+                                 </div>
+                                 
+                                 <div className="relative w-32 shrink-0">
+                                    <span className="absolute left-3 top-2.5 text-xs text-muted-foreground">£</span>
+                                    <Input placeholder="0.00" value={p.amount} onChange={e => handlePayoutChange(p.id, "amount", e.target.value)} onBlur={() => handlePayoutBlur(p.id)} className="pl-6 font-mono" readOnly={!isEditingMode} />
+                                 </div>
+                                 <Button variant="ghost" size="icon" onClick={() => setPayouts(s => s.filter(x => x.id !== p.id))} disabled={payouts.length === 1 || !isEditingMode}>×</Button>
+                               </div>
+                               
+                               {p.type === 'locum' && (
+                                  <div className="flex items-center space-x-2 pl-1">
+                                     <Checkbox id={`inv-${p.id}`} checked={p.invoiceUploaded} onCheckedChange={(c) => handlePayoutChange(p.id, "invoiceUploaded", c)} disabled={!isEditingMode} />
+                                     <Label htmlFor={`inv-${p.id}`} className={`text-xs ${validationErrors[`payout_${i}_invoice`] ? "text-destructive" : "text-muted-foreground"}`}>
+                                        I confirm I have uploaded the locum invoice
+                                     </Label>
+                                  </div>
+                               )}
+                             </div>
+                           ))}
+                           {isEditingMode && <Button variant="secondary" size="sm" onClick={() => setPayouts(s => [...s, {id: Date.now().toString(), type: "expense", label: "", amount: ""}])}>Add Payout</Button>}
+                        </div>
+
+                        <Separator />
+
+                        <div className="space-y-3">
+                           <div className="flex justify-between items-center">
+                              <div className="text-xs font-semibold text-muted-foreground uppercase">Bank Deposits</div>
+                           </div>
+                           {banking.length === 0 ? (
+                              <div className="text-xs text-muted-foreground italic pl-1">No banking entries today.</div>
+                           ) : banking.map((b, i) => (
+                             <div key={b.id} className="flex gap-2 items-start">
+                               <div className="flex-1 space-y-1">
+                                  <Input placeholder="Bank Location (e.g. Barclays High St)" value={b.location} onChange={e => setBanking(s => s.map(x => x.id === b.id ? {...x, location: e.target.value} : x))} className={validationErrors[`banking_${i}_location`] ? "border-destructive" : ""} readOnly={!isEditingMode} />
+                                  {validationErrors[`banking_${i}_location`] && <div className="text-[10px] text-destructive">{validationErrors[`banking_${i}_location`]}</div>}
+                               </div>
+                               <div className="relative w-32 shrink-0">
+                                  <span className="absolute left-3 top-2.5 text-xs text-muted-foreground">£</span>
+                                  <Input placeholder="0.00" value={b.amount} onChange={e => setBanking(s => s.map(x => x.id === b.id ? {...x, amount: normalizeMoney(e.target.value)} : x))} onBlur={() => {
+                                     setBanking(s => s.map(x => {
+                                        if (x.id === b.id && x.amount) {
+                                           const n = parseFloat(x.amount as string);
+                                           return {...x, amount: isNaN(n) ? "" : n.toFixed(2)};
+                                        } return x;
+                                     }));
+                                  }} className="pl-6 font-mono" readOnly={!isEditingMode} />
+                               </div>
+                               <Button variant="ghost" size="icon" onClick={() => setBanking(s => s.filter(x => x.id !== b.id))} disabled={!isEditingMode}>×</Button>
+                             </div>
+                           ))}
+                           {isEditingMode && <Button variant="secondary" size="sm" onClick={() => setBanking(s => [...s, {id: Date.now().toString(), location: "", amount: ""}])}>Add Bank Deposit</Button>}
+                        </div>
+                     </div>
+                  </Card>
+
+                  {/* VARIANCE CHECK */}
+                  <div className={`rounded-xl border p-5 ${validationErrors["userVariance"] ? 'border-destructive/50 bg-destructive/5' : 'bg-card/60 shadow-sm'}`}>
+                     <Label className="text-sm font-semibold">Cash Up Variance (Double Check)</Label>
+                     <div className="text-xs text-muted-foreground mb-3">Calculate the variance manually and enter it here to verify against the system.</div>
+                     <div className="relative space-y-1">
+                        <div className="relative">
+                           <span className="absolute left-3 top-3 text-xs text-muted-foreground">£</span>
+                           <Input 
+                              className={`pl-6 h-11 font-mono ${validationErrors["userVariance"] ? "border-destructive ring-destructive/20" : ""}`} 
+                              value={inputs.userVariance} onChange={e => updateInput("userVariance", e.target.value)} onBlur={() => handleBlur("userVariance")}
+                              readOnly={!isEditingMode} placeholder="0.00"
+                           />
+                        </div>
+                        {validationErrors["userVariance"] && (
+                           <div className="flex items-center gap-1.5 mt-1 text-xs text-destructive font-medium">
+                              <AlertCircle className="h-3.5 w-3.5" /> Mismatch check system variance.
+                           </div>
+                        )}
+                     </div>
+                  </div>
+                  
+                  {isEditingMode && (
+                     <div className="mt-6 flex gap-2">
+                        <Button className="h-12 w-full text-lg" onClick={handleSubmit}>
+                           Submit Cashing Up
+                        </Button>
+                     </div>
+                  )}
+                </div>
+             )}
+          </div>
+
+          <div className="grid gap-4 content-start">
+             <Card className="rounded-2xl border bg-card/60 p-5 shadow-sm sticky top-6">
                 <div className="text-sm font-semibold mb-3">System Calculations</div>
                 <div className="space-y-3 text-sm">
                    <div className="flex justify-between">
@@ -474,6 +510,35 @@ export default function CashingUp() {
                    <div className="flex justify-between font-medium">
                       <span>System Variance</span>
                       <span className={`font-mono ${systemVariance !== 0 ? 'text-destructive' : ''}`}>{formatCurrency(systemVariance)}</span>
+                   </div>
+                </div>
+             </Card>
+
+             <Card className="rounded-2xl border bg-card/60 p-5 shadow-sm">
+                <div className="flex items-center gap-2 mb-3">
+                   <Landmark className="h-4 w-4 text-primary" />
+                   <div className="text-sm font-semibold">Store Cash Monitor</div>
+                </div>
+                <div className="space-y-3 text-sm">
+                   <div className="flex justify-between text-muted-foreground text-xs">
+                      <span>Start of Day</span>
+                      <span className="font-mono">{formatCurrency(initialStoreCash)}</span>
+                   </div>
+                   <div className="flex justify-between text-muted-foreground text-xs">
+                      <span>To Bank Today</span>
+                      <span className="font-mono text-emerald-600">+{formatCurrency(inputs.toBeBanked)}</span>
+                   </div>
+                   <div className="flex justify-between text-muted-foreground text-xs">
+                      <span>Banked Today</span>
+                      <span className="font-mono text-red-500">-{formatCurrency(totalBanking)}</span>
+                   </div>
+                   <Separator />
+                   <div>
+                      <div className="flex justify-between font-semibold mb-1">
+                         <span>Month to Date Cash</span>
+                         <span className="font-mono text-lg">{formatCurrency(storeCashAfterDay)}</span>
+                      </div>
+                      <div className="text-[10px] text-muted-foreground text-right">Physical cash currently in store</div>
                    </div>
                 </div>
              </Card>

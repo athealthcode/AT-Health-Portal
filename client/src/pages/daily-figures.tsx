@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { CalendarIcon, FileText, CheckCircle2, AlertCircle, ArrowLeft, ArrowRight, Calendar, Lock, MessageSquareWarning } from "lucide-react";
+import { CalendarIcon, FileText, CheckCircle2, AlertCircle, ArrowLeft, ArrowRight, Calendar, Lock, MessageSquareWarning, ArrowUpRight, ArrowDownRight, Edit2 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { format } from "date-fns";
@@ -16,6 +16,7 @@ import { useAuth } from "@/state/auth";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Link, useLocation } from "wouter";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type ServiceField = { key: string; label: string; group: string; isCurrency?: boolean; subGroup?: string };
 
@@ -57,8 +58,6 @@ function normalizeInt(v: string) {
 
 function normalizeFloat(v: string) {
   if (v === "") return "";
-  // Allow simple typing like "9.9" or "9.90"
-  // Just strip illegal chars but keep dot
   return v.replace(/[^0-9.]/g, "");
 }
 
@@ -72,13 +71,33 @@ export default function DailyFigures() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { session } = useAuth();
-  const { isSubmitted, markSubmitted } = useSubmittedDays("figures");
   
-  const [date, setDate] = useState<Date | undefined>(new Date());
-  const [view, setView] = useState<"form" | "summary">("form");
-  const [lastSubmittedValues, setLastSubmittedValues] = useState<Record<string, string | number> | null>(null);
+  // Custom mock data hook for historical view
+  const [submittedData, setSubmittedData] = useState<Record<string, any>>({
+     "2026-03-01": { 
+        user: "John Smith", 
+        timestamp: new Date().getTime() - 86400000, 
+        values: { eps_rx_paid: 120, eps_rx_exempt: 340, paper_rx_paid: 10, paper_rx_exempt: 15, nhs_prepayment: "32.05" }
+     }
+  });
 
-  // Initialize with empty strings
+  const [date, setDate] = useState<Date | undefined>(new Date());
+  
+  const formattedDate = date ? format(date, "yyyy-MM-dd") : "";
+  const existingRecord = submittedData[formattedDate];
+  
+  // Is this Head Office/Ahmed who can edit any day?
+  const isHeadOffice = session.scope.type === "headoffice";
+  
+  // State for view vs edit mode
+  const [isEditingMode, setIsEditingMode] = useState(!existingRecord);
+
+  // Re-evaluate editing mode when date changes
+  useEffect(() => {
+     setIsEditingMode(!submittedData[formattedDate] || isHeadOffice);
+  }, [formattedDate, submittedData, isHeadOffice]);
+
+  // Values State
   const [values, setValues] = useState<Record<string, string | number>>(() => {
     const init: Record<string, string | number> = {};
     PRESCRIPTION_FIELDS.forEach(f => {
@@ -89,17 +108,35 @@ export default function DailyFigures() {
     return init;
   });
 
-  const [validationError, setValidationError] = useState<string | null>(null);
-  const [highlightMissing, setHighlightMissing] = useState(false);
+  // Load existing data if available
+  useEffect(() => {
+     if (existingRecord) {
+        // Merge with empty to ensure all fields exist
+        const init: Record<string, string | number> = {};
+        PRESCRIPTION_FIELDS.forEach(f => {
+          init[f.epsKey] = "";
+          init[f.paperKey] = "";
+        });
+        OTHER_FIELDS.forEach(f => { init[f.key] = ""; });
+        setValues({ ...init, ...existingRecord.values });
+     } else {
+        // Reset to blank strings
+        const init: Record<string, string | number> = {};
+        PRESCRIPTION_FIELDS.forEach(f => {
+          init[f.epsKey] = "";
+          init[f.paperKey] = "";
+        });
+        OTHER_FIELDS.forEach(f => { init[f.key] = ""; });
+        setValues(init);
+     }
+  }, [formattedDate, existingRecord]);
+
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [globalError, setGlobalError] = useState<string | null>(null);
   
-  // Problem Report State
-  const [reportOpen, setReportOpen] = useState(false);
-  const [problemMessage, setProblemMessage] = useState("");
+  const [notCompletedReason, setNotCompletedReason] = useState("");
+  const [notCompletedOpen, setNotCompletedOpen] = useState(false);
 
-  const formattedDate = date ? format(date, "yyyy-MM-dd") : "";
-  const submissionRecord = useMemo(() => isSubmitted(formattedDate), [formattedDate, isSubmitted]);
-
-  // Computed NMS Total (handling empty strings as 0 for display)
   const nmsTotal = (Number(values["nms_intervention"] || 0)) + (Number(values["nms_follow_up"] || 0));
 
   const groupedOther = useMemo(() => {
@@ -114,8 +151,16 @@ export default function DailyFigures() {
   const updateValue = (key: string, valStr: string, isCurrency = false) => {
       const val = isCurrency ? normalizeFloat(valStr) : normalizeInt(valStr);
       setValues(s => ({ ...s, [key]: val }));
-      setValidationError(null);
-      setHighlightMissing(false);
+      
+      // Clear specific error on change
+      if (validationErrors[key]) {
+         setValidationErrors(prev => {
+            const next = { ...prev };
+            delete next[key];
+            return next;
+         });
+      }
+      setGlobalError(null);
   };
 
   const handleBlur = (key: string, isCurrency: boolean) => {
@@ -128,407 +173,432 @@ export default function DailyFigures() {
   };
 
   const validate = () => {
-     if (!date) return "Trading date is required.";
+     const errors: Record<string, string> = {};
+     let hasMissing = false;
 
-     // Check for empty fields
-     const missing = [...PRESCRIPTION_FIELDS.flatMap(f => [f.epsKey, f.paperKey]), ...OTHER_FIELDS.map(f => f.key)]
-        .filter(k => values[k] === "");
+     if (!date) return { global: "Trading date is required.", errors };
+
+     // Check missing fields (MUST explicitly enter 0)
+     const allKeys = [...PRESCRIPTION_FIELDS.flatMap(f => [f.epsKey, f.paperKey]), ...OTHER_FIELDS.map(f => f.key)];
      
-     if (missing.length > 0) {
-        setHighlightMissing(true);
-        return "Field not filled in. Please ensure all fields have a value (enter 0 if none).";
-     }
+     allKeys.forEach(k => {
+        if (values[k] === "") {
+           errors[k] = "Field is required. Enter 0 if none.";
+           hasMissing = true;
+        }
+     });
 
-     // Currency validation (multiples of 9.90)
-     const nhsPrep = Number(values["nhs_prepayment"]);
-     const fp57 = Number(values["fp57_refund"]);
-
-     const isValidMultiple = (val: number) => {
-        if (val === 0) return true;
-        const ratio = val / 9.90;
-        return Math.abs(ratio - Math.round(ratio)) < 0.001;
+     // Currency validation logic
+     const validatePrepMult = (key: string) => {
+        if (values[key] === "" || values[key] == "0" || values[key] == "0.00") return;
+        const val = Number(values[key]);
+        // Accepted NHS Prepayment multiples
+        const m1 = 32.05;
+        const m2 = 114.50;
+        const m3 = 19.80; // Added extra standard price
+        
+        const isM1 = Math.abs(val % m1) < 0.01;
+        const isM2 = Math.abs(val % m2) < 0.01;
+        const isM3 = Math.abs(val % m3) < 0.01;
+        // Basic check: is it a multiple of ANY of the accepted values or combination
+        // For strictness, let's just check if it's cleanly divisible by one of them
+        
+        if (!isM1 && !isM2 && !isM3) {
+           errors[key] = `Must be a multiple of £32.05, £114.50, or £19.80`;
+        }
      };
 
-     if (!isValidMultiple(nhsPrep)) return "NHS Prepayment must be a multiple of £9.90 (or 0).";
-     if (!isValidMultiple(fp57)) return "FP57 Refund must be a multiple of £9.90 (or 0).";
+     validatePrepMult("nhs_prepayment");
 
-     return null;
+     // FP57 is typically multiples of £9.90
+     if (values["fp57_refund"] !== "" && values["fp57_refund"] !== "0" && values["fp57_refund"] !== "0.00") {
+        const fp57 = Number(values["fp57_refund"]);
+        const ratio = fp57 / 9.90;
+        if (Math.abs(ratio - Math.round(ratio)) > 0.001) {
+           errors["fp57_refund"] = "Must be a multiple of £9.90";
+        }
+     }
+
+     if (hasMissing) {
+        return { global: "Missing fields. Please ensure all fields have a value (enter 0 if none).", errors };
+     }
+     
+     if (Object.keys(errors).length > 0) {
+        return { global: "Please fix the validation errors in the highlighted fields.", errors };
+     }
+
+     return { global: null, errors: {} };
   };
 
   const handleSubmit = () => {
-     const error = validate();
-     if (error) {
-        setValidationError(error);
-        toast({ title: "Validation Error", description: error, variant: "destructive" });
+     const { global, errors } = validate();
+     
+     if (global || Object.keys(errors).length > 0) {
+        setValidationErrors(errors);
+        setGlobalError(global);
+        toast({ title: "Validation Error", description: global || "Please fix errors.", variant: "destructive" });
         return;
      }
 
-     markSubmitted(formattedDate, session.staff?.name || "Unknown");
-     setLastSubmittedValues({ ...values });
-     setView("summary");
+     // Save
+     setSubmittedData(prev => ({
+        ...prev,
+        [formattedDate]: {
+           user: session.staff?.name || session.userEmail || "Unknown",
+           timestamp: Date.now(),
+           values: { ...values }
+        }
+     }));
+
+     setIsEditingMode(false);
+     toast({ title: "Figures Submitted", description: `Daily figures for ${format(date!, "PPP")} have been saved.` });
+  };
+
+  const handleMarkNotCompleted = () => {
+     if (!notCompletedReason) {
+        toast({ title: "Reason Required", description: "You must provide a reason.", variant: "destructive" });
+        return;
+     }
      
-     // Reset Form for next entry
-     const next: Record<string, string | number> = {};
-     PRESCRIPTION_FIELDS.forEach(f => { next[f.epsKey] = ""; next[f.paperKey] = ""; });
-     OTHER_FIELDS.forEach(f => { next[f.key] = ""; });
-     setValues(next);
-     setHighlightMissing(false);
+     setSubmittedData(prev => ({
+        ...prev,
+        [formattedDate]: {
+           user: session.staff?.name || session.userEmail || "Unknown",
+           timestamp: Date.now(),
+           status: "not_completed",
+           reason: notCompletedReason,
+           values: {}
+        }
+     }));
+     
+     setNotCompletedOpen(false);
+     setIsEditingMode(false);
+     toast({ title: "Status Updated", description: "Marked as not completed." });
   };
 
-  const handleRaiseProblem = () => {
-     toast({ title: "Problem Reported", description: "Head Office has been notified." });
-     setReportOpen(false);
-     setProblemMessage("");
-  };
-
-  // If already submitted and user is trying to view form for that day
-  if (submissionRecord && view === "form" && !lastSubmittedValues) {
-     return (
-        <AppShell>
-           <div className="flex flex-col gap-6 max-w-3xl mx-auto mt-10">
-              <div className="flex items-center gap-4">
-                 <Button variant="ghost" onClick={() => window.history.back()}>
-                    <ArrowLeft className="h-4 w-4 mr-2" /> Back
-                 </Button>
-                 <h1 className="font-serif text-2xl">Daily Figures</h1>
-              </div>
-
-              <Card className="p-8 border-l-4 border-l-blue-500 bg-blue-50/50">
-                 <div className="flex items-start gap-4">
-                    <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
-                       <Lock className="h-6 w-6" />
-                    </div>
-                    <div className="space-y-2 flex-1">
-                       <h2 className="text-lg font-semibold text-blue-900">Already Submitted</h2>
-                       <p className="text-blue-800/80">
-                          Figures for <span className="font-medium">{format(date!, "PPP")}</span> were already submitted by <span className="font-medium">{submissionRecord.user}</span> on {new Date(submissionRecord.timestamp).toLocaleTimeString()}.
-                       </p>
-                       <p className="text-sm text-blue-800/60">
-                          Only one submission is allowed per trading day. If this is incorrect, please raise a problem.
-                       </p>
-                    </div>
-                 </div>
-                 
-                 <div className="mt-6 flex gap-3">
-                    <Dialog open={reportOpen} onOpenChange={setReportOpen}>
-                       <DialogTrigger asChild>
-                          <Button variant="outline" className="text-destructive hover:text-destructive border-destructive/20 hover:bg-destructive/5">
-                             <MessageSquareWarning className="h-4 w-4 mr-2" />
-                             Raise a problem
-                          </Button>
-                       </DialogTrigger>
-                       <DialogContent>
-                          <DialogHeader>
-                             <DialogTitle>Raise a Problem</DialogTitle>
-                             <DialogDescription>
-                                Describe the issue with this submission. Head Office will be notified.
-                             </DialogDescription>
-                          </DialogHeader>
-                          <div className="space-y-4 py-4">
-                             <div className="grid gap-2">
-                                <Label>Message</Label>
-                                <Textarea 
-                                   value={problemMessage} 
-                                   onChange={e => setProblemMessage(e.target.value)} 
-                                   placeholder="e.g. Incorrect totals entered by mistake..."
-                                />
-                             </div>
-                          </div>
-                          <DialogFooter>
-                             <Button onClick={handleRaiseProblem}>Send Report</Button>
-                          </DialogFooter>
-                       </DialogContent>
-                    </Dialog>
-                    
-                    <Button variant="secondary" onClick={() => setDate(new Date())}>
-                       Select Different Date
-                    </Button>
-                 </div>
-              </Card>
-           </div>
-        </AppShell>
-     );
-  }
-
-  if (view === "summary" && lastSubmittedValues) {
-     const prescriptionTotal = PRESCRIPTION_FIELDS.reduce((acc, f) => 
-        acc + Number(lastSubmittedValues[f.epsKey] || 0) + Number(lastSubmittedValues[f.paperKey] || 0), 0
-     );
-
-     return (
-        <AppShell>
-           <div className="flex flex-col gap-6 max-w-2xl mx-auto items-center justify-center min-h-[60vh]">
-              <div className="h-20 w-20 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-4">
-                 <CheckCircle2 className="h-10 w-10" />
-              </div>
-              <div className="text-center space-y-2">
-                 <h2 className="text-3xl font-semibold tracking-tight">Submission Complete</h2>
-                 <p className="text-muted-foreground">
-                    Daily figures for <span className="font-medium text-foreground">{date ? format(date, "PPP") : "Unknown Date"}</span> have been recorded.
-                 </p>
-              </div>
-
-              <Card className="w-full p-6 mt-4 bg-card/60">
-                 <h3 className="text-sm font-semibold mb-4 uppercase tracking-wider text-muted-foreground">Summary of Entry</h3>
-                 <div className="grid grid-cols-2 gap-4 text-sm">
-                    {PRESCRIPTION_FIELDS.map(f => (
-                       <>
-                          <div className="flex justify-between border-b pb-2 text-muted-foreground" key={`${f.epsKey}-label`}>
-                             <span>EPS {f.label} ({f.type})</span>
-                             <span className="font-mono font-medium text-foreground">{lastSubmittedValues[f.epsKey]}</span>
-                          </div>
-                          <div className="flex justify-between border-b pb-2 text-muted-foreground" key={`${f.paperKey}-label`}>
-                             <span>Paper {f.label} ({f.type})</span>
-                             <span className="font-mono font-medium text-foreground">{lastSubmittedValues[f.paperKey]}</span>
-                          </div>
-                       </>
-                    ))}
-                    
-                    {OTHER_FIELDS.map(f => (
-                       <div key={f.key} className="flex justify-between border-b pb-2">
-                          <span>{f.label}</span>
-                          <span className="font-mono font-medium">
-                             {f.isCurrency ? formatCurrency(lastSubmittedValues[f.key]) : lastSubmittedValues[f.key]}
-                          </span>
-                       </div>
-                    ))}
-                 </div>
-              </Card>
-
-              <div className="flex gap-4 w-full">
-                 <Button variant="outline" className="flex-1 h-12" onClick={() => setLocation("/")}>
-                    <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
-                 </Button>
-                 <Button className="flex-1 h-12" onClick={() => { setView("form"); setLastSubmittedValues(null); setDate(undefined); }}>
-                    Enter Another Day <ArrowRight className="ml-2 h-4 w-4" />
-                 </Button>
-              </div>
-           </div>
-        </AppShell>
-     );
-  }
+  // MTD Summaries Mock Data
+  const mtdSummary = [
+     { label: "Total Prescriptions/Items", value: "9,120", prev: "8,930", change: "+2.1%", up: true },
+     { label: "Total NMS", value: "62", prev: "54", change: "+14.8%", up: true },
+     { label: "Total DMS", value: "14", prev: "18", change: "-22.2%", up: false },
+     { label: "Hypertension Case Finding", value: "45", prev: "40", change: "+12.5%", up: true },
+     { label: "ABPM", value: "8", prev: "8", change: "0%", up: true },
+     { label: "Contraception", value: "112", prev: "95", change: "+17.8%", up: true },
+     { label: "Vaccinations", value: "320", prev: "210", change: "+52.3%", up: true },
+     { label: "Local Services", value: "85", prev: "90", change: "-5.5%", up: false },
+  ];
 
   return (
     <AppShell>
-      <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-6">
         <div>
-          <div className="font-serif text-2xl tracking-tight" data-testid="text-daily-figures-title">Daily Figures</div>
-          <div className="text-sm text-muted-foreground" data-testid="text-daily-figures-subtitle">
-            Enter today's running totals. All fields are mandatory (please enter 0 if none).
+          <div className="font-serif text-2xl tracking-tight">Daily Figures</div>
+          <div className="text-sm text-muted-foreground">
+            Enter today's running totals. You must explicitly enter 0 for fields with no activity.
           </div>
         </div>
 
-        <div className="grid gap-3 lg:grid-cols-[1fr_320px]">
+        {/* MTD Summary Strip */}
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+           {mtdSummary.map((m, i) => (
+              <Card key={i} className="p-3 rounded-xl border bg-card/60 shadow-sm flex flex-col justify-between">
+                 <div className="text-[10px] font-semibold uppercase text-muted-foreground leading-tight mb-2 h-8 line-clamp-2">
+                    {m.label}
+                 </div>
+                 <div>
+                    <div className="font-mono font-bold text-lg">{m.value}</div>
+                    <div className={`text-[10px] flex items-center mt-0.5 font-medium ${m.up ? "text-emerald-600" : "text-red-500"}`}>
+                       {m.up ? <ArrowUpRight className="h-3 w-3 mr-0.5"/> : <ArrowDownRight className="h-3 w-3 mr-0.5"/>}
+                       {m.change}
+                    </div>
+                 </div>
+              </Card>
+           ))}
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
           <div className="space-y-6">
             
-            {/* DATE SELECTOR */}
-            <Card className="p-4 flex items-center gap-4 bg-primary/5 border-primary/20">
-               <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                  <Calendar className="h-5 w-5" />
+            {/* DATE SELECTOR & STATUS */}
+            <Card className={`p-4 flex items-center gap-4 border ${existingRecord ? (existingRecord.status === 'not_completed' ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200') : 'bg-primary/5 border-primary/20'}`}>
+               <div className={`h-10 w-10 rounded-full flex items-center justify-center shrink-0 ${existingRecord ? (existingRecord.status === 'not_completed' ? 'bg-amber-100 text-amber-600' : 'bg-emerald-100 text-emerald-600') : 'bg-primary/10 text-primary'}`}>
+                  {existingRecord ? <CheckCircle2 className="h-5 w-5" /> : <Calendar className="h-5 w-5" />}
                </div>
                <div className="flex-1">
-                  <div className="text-sm font-medium">Trading Date</div>
-                  <div className="text-xs text-muted-foreground">Ensure this matches the day you are reporting for.</div>
-               </div>
-               <Popover>
-                  <PopoverTrigger asChild>
-                     <Button
-                        variant="outline"
-                        className={`w-[200px] justify-start text-left font-normal bg-background ${!date && "text-muted-foreground"}`}
-                     >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {date ? format(date, "PPP") : <span>Pick a date</span>}
-                     </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="end">
-                     <CalendarComponent
-                        mode="single"
-                        selected={date}
-                        onSelect={setDate}
-                        initialFocus
-                     />
-                  </PopoverContent>
-               </Popover>
-            </Card>
-
-            {/* PRESCRIPTION FIGURES GRID */}
-            <Card className="rounded-2xl border bg-card/60 p-5 overflow-hidden" data-testid="card-group-prescription">
-               <div className="flex items-center gap-2 mb-5">
-                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                     <FileText className="h-4 w-4" />
+                  <div className="text-sm font-medium flex items-center gap-2">
+                     Trading Date
+                     {existingRecord ? (
+                        <Badge variant="outline" className={`h-5 text-[10px] ${existingRecord.status === 'not_completed' ? 'border-amber-500 text-amber-600' : 'border-emerald-500 text-emerald-600'}`}>
+                           {existingRecord.status === 'not_completed' ? 'Not Completed' : 'Entered'}
+                        </Badge>
+                     ) : (
+                        <Badge variant="outline" className="h-5 text-[10px] border-red-500 text-red-600">Not Entered</Badge>
+                     )}
                   </div>
-                  <div className="text-sm font-semibold tracking-wide uppercase text-foreground">Prescription Figures</div>
-               </div>
-
-               <div className="grid grid-cols-[1fr_1fr_1fr] gap-4 mb-2 px-2">
-                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Type</div>
-                  <div className="text-xs font-semibold text-primary uppercase tracking-wider text-center bg-primary/5 rounded py-1">EPS (Electronic)</div>
-                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center bg-muted/50 rounded py-1">Paper</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                     {existingRecord 
+                        ? `Last updated by ${existingRecord.user}` 
+                        : "Ensure this matches the day you are reporting for."}
+                  </div>
                </div>
                
-               <div className="space-y-4">
-                  <div className="space-y-2">
-                      <div className="text-xs font-bold text-foreground px-2">Paid</div>
-                      <div className="grid grid-cols-[1fr_1fr_1fr] gap-4 items-center bg-slate-50/50 p-2 rounded-lg border border-transparent hover:border-border transition-colors">
-                          <div className="text-sm font-medium text-muted-foreground">Prescriptions (Rx)</div>
-                          <Input 
-                             className={`h-10 text-center font-mono ${highlightMissing && values["eps_rx_paid"] === "" ? "border-destructive ring-destructive/20" : "border-primary/20 focus-visible:ring-primary/20"}`}
-                             value={values["eps_rx_paid"]}
-                             onChange={e => updateValue("eps_rx_paid", e.target.value)}
-                             placeholder=""
-                          />
-                          <Input 
-                             className={`h-10 text-center font-mono ${highlightMissing && values["paper_rx_paid"] === "" ? "border-destructive ring-destructive/20" : ""}`}
-                             value={values["paper_rx_paid"]}
-                             onChange={e => updateValue("paper_rx_paid", e.target.value)}
-                             placeholder=""
-                          />
-                      </div>
-                      <div className="grid grid-cols-[1fr_1fr_1fr] gap-4 items-center bg-slate-50/50 p-2 rounded-lg border border-transparent hover:border-border transition-colors">
-                          <div className="text-sm font-medium text-muted-foreground">Items</div>
-                          <Input 
-                             className={`h-10 text-center font-mono ${highlightMissing && values["eps_items_paid"] === "" ? "border-destructive ring-destructive/20" : "border-primary/20 focus-visible:ring-primary/20"}`}
-                             value={values["eps_items_paid"]}
-                             onChange={e => updateValue("eps_items_paid", e.target.value)}
-                             placeholder=""
-                          />
-                          <Input 
-                             className={`h-10 text-center font-mono ${highlightMissing && values["paper_items_paid"] === "" ? "border-destructive ring-destructive/20" : ""}`}
-                             value={values["paper_items_paid"]}
-                             onChange={e => updateValue("paper_items_paid", e.target.value)}
-                             placeholder=""
-                          />
-                      </div>
-                  </div>
+               <div className="flex items-center gap-2">
+                  <Popover>
+                     <PopoverTrigger asChild>
+                        <Button
+                           variant="outline"
+                           className={`w-[180px] justify-start text-left font-normal bg-background ${!date && "text-muted-foreground"}`}
+                        >
+                           <CalendarIcon className="mr-2 h-4 w-4" />
+                           {date ? format(date, "PPP") : <span>Pick a date</span>}
+                        </Button>
+                     </PopoverTrigger>
+                     <PopoverContent className="w-auto p-0" align="end">
+                        <CalendarComponent
+                           mode="single"
+                           selected={date}
+                           onSelect={setDate}
+                           initialFocus
+                        />
+                     </PopoverContent>
+                  </Popover>
 
-                  <Separator />
-
-                  <div className="space-y-2">
-                      <div className="text-xs font-bold text-foreground px-2">Exempt</div>
-                      <div className="grid grid-cols-[1fr_1fr_1fr] gap-4 items-center bg-slate-50/50 p-2 rounded-lg border border-transparent hover:border-border transition-colors">
-                          <div className="text-sm font-medium text-muted-foreground">Prescriptions (Rx)</div>
-                          <Input 
-                             className={`h-10 text-center font-mono ${highlightMissing && values["eps_rx_exempt"] === "" ? "border-destructive ring-destructive/20" : "border-primary/20 focus-visible:ring-primary/20"}`}
-                             value={values["eps_rx_exempt"]}
-                             onChange={e => updateValue("eps_rx_exempt", e.target.value)}
-                             placeholder=""
-                          />
-                          <Input 
-                             className={`h-10 text-center font-mono ${highlightMissing && values["paper_rx_exempt"] === "" ? "border-destructive ring-destructive/20" : ""}`}
-                             value={values["paper_rx_exempt"]}
-                             onChange={e => updateValue("paper_rx_exempt", e.target.value)}
-                             placeholder=""
-                          />
-                      </div>
-                      <div className="grid grid-cols-[1fr_1fr_1fr] gap-4 items-center bg-slate-50/50 p-2 rounded-lg border border-transparent hover:border-border transition-colors">
-                          <div className="text-sm font-medium text-muted-foreground">Items</div>
-                          <Input 
-                             className={`h-10 text-center font-mono ${highlightMissing && values["eps_items_exempt"] === "" ? "border-destructive ring-destructive/20" : "border-primary/20 focus-visible:ring-primary/20"}`}
-                             value={values["eps_items_exempt"]}
-                             onChange={e => updateValue("eps_items_exempt", e.target.value)}
-                             placeholder=""
-                          />
-                          <Input 
-                             className={`h-10 text-center font-mono ${highlightMissing && values["paper_items_exempt"] === "" ? "border-destructive ring-destructive/20" : ""}`}
-                             value={values["paper_items_exempt"]}
-                             onChange={e => updateValue("paper_items_exempt", e.target.value)}
-                             placeholder=""
-                          />
-                      </div>
-                  </div>
+                  {/* Manager Only: Mark not completed */}
+                  {(session.role === "Pharmacy Manager" || isHeadOffice) && !existingRecord && (
+                     <Dialog open={notCompletedOpen} onOpenChange={setNotCompletedOpen}>
+                        <DialogTrigger asChild>
+                           <Button variant="outline" className="text-amber-600 border-amber-200 hover:bg-amber-50">
+                              Mark Not Completed
+                           </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                           <DialogHeader>
+                              <DialogTitle>Mark Day as Not Completed</DialogTitle>
+                              <DialogDescription>
+                                 This will flag the trading day as deliberately skipped. Authorisation tracked.
+                              </DialogDescription>
+                           </DialogHeader>
+                           <div className="py-4">
+                              <Label>Reason</Label>
+                              <Textarea 
+                                 value={notCompletedReason} 
+                                 onChange={e => setNotCompletedReason(e.target.value)} 
+                                 placeholder="e.g. Closed due to bank holiday"
+                                 className="mt-2"
+                              />
+                           </div>
+                           <DialogFooter>
+                              <Button onClick={handleMarkNotCompleted}>Confirm & Save</Button>
+                           </DialogFooter>
+                        </DialogContent>
+                     </Dialog>
+                  )}
                </div>
             </Card>
 
-            {Object.entries(groupedOther).map(([group, groupFields]) => (
-              <Card key={group} className="rounded-2xl border bg-card/60 p-5" data-testid={`card-group-${group}`}>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="text-sm font-semibold tracking-wide text-foreground uppercase">
-                    {group}
-                  </div>
-                  {group === "NMS" && (
-                    <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">Combined: {nmsTotal}</Badge>
+            {globalError && (
+               <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm p-3 rounded-lg flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  {globalError}
+               </div>
+            )}
+
+            {existingRecord && existingRecord.status === 'not_completed' ? (
+               <Card className="p-8 text-center border-dashed bg-muted/30">
+                  <AlertCircle className="h-10 w-10 text-amber-500 mx-auto mb-3" />
+                  <h3 className="font-semibold text-lg">Marked as Not Completed</h3>
+                  <p className="text-muted-foreground mt-1 max-w-md mx-auto">
+                     Reason: {existingRecord.reason}
+                  </p>
+                  {isHeadOffice && (
+                     <Button variant="outline" className="mt-4" onClick={() => setIsEditingMode(true)}>
+                        <Edit2 className="h-4 w-4 mr-2" /> Override & Enter Data
+                     </Button>
                   )}
-                </div>
-                
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                  {groupFields.map((f) => (
-                    <div key={f.key} className="space-y-1.5">
-                      <Label className="text-xs font-medium text-muted-foreground" data-testid={`label-${f.key}`}>
-                        {f.label}
-                      </Label>
-                      <Input
-                        inputMode={f.isCurrency ? "decimal" : "numeric"}
-                        value={values[f.key]}
-                        onChange={(e) => updateValue(f.key, e.target.value, f.isCurrency)}
-                        onBlur={() => handleBlur(f.key, !!f.isCurrency)}
-                        className={`h-10 font-mono bg-background/50 ${highlightMissing && values[f.key] === "" ? "border-destructive ring-destructive/20" : ""}`}
-                        data-testid={`input-${f.key}`}
-                        placeholder=""
-                      />
-                    </div>
+               </Card>
+            ) : (
+               <div className={!isEditingMode ? "pointer-events-none opacity-80" : ""}>
+                  {!isEditingMode && !isHeadOffice && (
+                     <div className="mb-4 bg-blue-50 border border-blue-200 text-blue-800 p-3 rounded-xl flex items-center gap-3 text-sm">
+                        <Lock className="h-4 w-4 shrink-0" />
+                        Figures have been submitted for this date and are now view-only.
+                     </div>
+                  )}
+
+                  {/* PRESCRIPTION FIGURES GRID */}
+                  <Card className="rounded-2xl border bg-card/60 p-5 overflow-hidden shadow-sm" data-testid="card-group-prescription">
+                     <div className="flex items-center gap-2 mb-5">
+                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                           <FileText className="h-4 w-4" />
+                        </div>
+                        <div className="text-sm font-semibold tracking-wide uppercase text-foreground">Prescription Figures</div>
+                     </div>
+
+                     <div className="grid grid-cols-[1fr_1fr_1fr] gap-4 mb-2 px-2">
+                        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Type</div>
+                        <div className="text-xs font-semibold text-primary uppercase tracking-wider text-center bg-primary/5 rounded py-1">EPS (Electronic)</div>
+                        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center bg-muted/50 rounded py-1">Paper</div>
+                     </div>
+                     
+                     <div className="space-y-4">
+                        <div className="space-y-2">
+                            <div className="text-xs font-bold text-foreground px-2">Paid</div>
+                            <div className="grid grid-cols-[1fr_1fr_1fr] gap-4 items-center bg-slate-50/50 p-2 rounded-lg border border-transparent hover:border-border transition-colors">
+                                <div className="text-sm font-medium text-muted-foreground">Prescriptions (Rx)</div>
+                                <div className="space-y-1">
+                                   <Input 
+                                      className={`h-10 text-center font-mono ${validationErrors["eps_rx_paid"] ? "border-destructive ring-destructive/20 focus-visible:ring-destructive/20" : "border-primary/20 focus-visible:ring-primary/20"}`}
+                                      value={values["eps_rx_paid"]}
+                                      onChange={e => updateValue("eps_rx_paid", e.target.value)}
+                                      readOnly={!isEditingMode}
+                                   />
+                                   {validationErrors["eps_rx_paid"] && <div className="text-[10px] text-destructive text-center">{validationErrors["eps_rx_paid"]}</div>}
+                                </div>
+                                <div className="space-y-1">
+                                   <Input 
+                                      className={`h-10 text-center font-mono ${validationErrors["paper_rx_paid"] ? "border-destructive ring-destructive/20" : ""}`}
+                                      value={values["paper_rx_paid"]}
+                                      onChange={e => updateValue("paper_rx_paid", e.target.value)}
+                                      readOnly={!isEditingMode}
+                                   />
+                                   {validationErrors["paper_rx_paid"] && <div className="text-[10px] text-destructive text-center">{validationErrors["paper_rx_paid"]}</div>}
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-[1fr_1fr_1fr] gap-4 items-center bg-slate-50/50 p-2 rounded-lg border border-transparent hover:border-border transition-colors">
+                                <div className="text-sm font-medium text-muted-foreground">Items</div>
+                                <div className="space-y-1">
+                                   <Input 
+                                      className={`h-10 text-center font-mono ${validationErrors["eps_items_paid"] ? "border-destructive ring-destructive/20" : "border-primary/20"}`}
+                                      value={values["eps_items_paid"]}
+                                      onChange={e => updateValue("eps_items_paid", e.target.value)}
+                                      readOnly={!isEditingMode}
+                                   />
+                                   {validationErrors["eps_items_paid"] && <div className="text-[10px] text-destructive text-center">{validationErrors["eps_items_paid"]}</div>}
+                                </div>
+                                <div className="space-y-1">
+                                   <Input 
+                                      className={`h-10 text-center font-mono ${validationErrors["paper_items_paid"] ? "border-destructive ring-destructive/20" : ""}`}
+                                      value={values["paper_items_paid"]}
+                                      onChange={e => updateValue("paper_items_paid", e.target.value)}
+                                      readOnly={!isEditingMode}
+                                   />
+                                   {validationErrors["paper_items_paid"] && <div className="text-[10px] text-destructive text-center">{validationErrors["paper_items_paid"]}</div>}
+                                </div>
+                            </div>
+                        </div>
+
+                        <Separator />
+
+                        <div className="space-y-2">
+                            <div className="text-xs font-bold text-foreground px-2">Exempt</div>
+                            <div className="grid grid-cols-[1fr_1fr_1fr] gap-4 items-center bg-slate-50/50 p-2 rounded-lg border border-transparent hover:border-border transition-colors">
+                                <div className="text-sm font-medium text-muted-foreground">Prescriptions (Rx)</div>
+                                <div className="space-y-1">
+                                   <Input 
+                                      className={`h-10 text-center font-mono ${validationErrors["eps_rx_exempt"] ? "border-destructive ring-destructive/20" : "border-primary/20"}`}
+                                      value={values["eps_rx_exempt"]}
+                                      onChange={e => updateValue("eps_rx_exempt", e.target.value)}
+                                      readOnly={!isEditingMode}
+                                   />
+                                   {validationErrors["eps_rx_exempt"] && <div className="text-[10px] text-destructive text-center">{validationErrors["eps_rx_exempt"]}</div>}
+                                </div>
+                                <div className="space-y-1">
+                                   <Input 
+                                      className={`h-10 text-center font-mono ${validationErrors["paper_rx_exempt"] ? "border-destructive ring-destructive/20" : ""}`}
+                                      value={values["paper_rx_exempt"]}
+                                      onChange={e => updateValue("paper_rx_exempt", e.target.value)}
+                                      readOnly={!isEditingMode}
+                                   />
+                                   {validationErrors["paper_rx_exempt"] && <div className="text-[10px] text-destructive text-center">{validationErrors["paper_rx_exempt"]}</div>}
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-[1fr_1fr_1fr] gap-4 items-center bg-slate-50/50 p-2 rounded-lg border border-transparent hover:border-border transition-colors">
+                                <div className="text-sm font-medium text-muted-foreground">Items</div>
+                                <div className="space-y-1">
+                                   <Input 
+                                      className={`h-10 text-center font-mono ${validationErrors["eps_items_exempt"] ? "border-destructive ring-destructive/20" : "border-primary/20"}`}
+                                      value={values["eps_items_exempt"]}
+                                      onChange={e => updateValue("eps_items_exempt", e.target.value)}
+                                      readOnly={!isEditingMode}
+                                   />
+                                   {validationErrors["eps_items_exempt"] && <div className="text-[10px] text-destructive text-center">{validationErrors["eps_items_exempt"]}</div>}
+                                </div>
+                                <div className="space-y-1">
+                                   <Input 
+                                      className={`h-10 text-center font-mono ${validationErrors["paper_items_exempt"] ? "border-destructive ring-destructive/20" : ""}`}
+                                      value={values["paper_items_exempt"]}
+                                      onChange={e => updateValue("paper_items_exempt", e.target.value)}
+                                      readOnly={!isEditingMode}
+                                   />
+                                   {validationErrors["paper_items_exempt"] && <div className="text-[10px] text-destructive text-center">{validationErrors["paper_items_exempt"]}</div>}
+                                </div>
+                            </div>
+                        </div>
+                     </div>
+                  </Card>
+
+                  {/* OTHER SECTIONS */}
+                  {Object.entries(groupedOther).map(([group, groupFields]) => (
+                    <Card key={group} className="rounded-2xl border bg-card/60 p-5 mt-4 shadow-sm" data-testid={`card-group-${group}`}>
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="text-sm font-semibold tracking-wide text-foreground uppercase">
+                          {group}
+                        </div>
+                        {group === "NMS" && (
+                          <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">Combined: {nmsTotal}</Badge>
+                        )}
+                      </div>
+                      
+                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                        {groupFields.map((f) => (
+                          <div key={f.key} className="space-y-1.5 relative">
+                            <Label className="text-xs font-medium text-muted-foreground" data-testid={`label-${f.key}`}>
+                              {f.label}
+                            </Label>
+                            <div className="relative">
+                               {f.isCurrency && <span className="absolute left-3 top-2.5 text-xs text-muted-foreground">£</span>}
+                               <Input
+                                 className={`font-mono h-10 ${f.isCurrency ? "pl-6" : ""} ${validationErrors[f.key] ? "border-destructive ring-destructive/20 focus-visible:ring-destructive/20" : ""}`}
+                                 value={values[f.key]}
+                                 onChange={(e) => updateValue(f.key, e.target.value, f.isCurrency)}
+                                 onBlur={() => handleBlur(f.key, f.isCurrency || false)}
+                                 data-testid={`input-${f.key}`}
+                                 readOnly={!isEditingMode}
+                               />
+                            </div>
+                            {validationErrors[f.key] && (
+                               <div className="text-[10px] text-destructive leading-tight absolute -bottom-4 left-0">
+                                  {validationErrors[f.key]}
+                               </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </Card>
                   ))}
-                </div>
-              </Card>
-            ))}
+                  
+                  {isEditingMode && (
+                     <div className="mt-6 flex justify-end">
+                        <Button size="lg" className="w-full md:w-auto px-8" onClick={handleSubmit}>
+                           Submit Daily Figures
+                        </Button>
+                     </div>
+                  )}
+               </div>
+            )}
           </div>
 
-          <div className="space-y-3">
-             <Card className="rounded-2xl border bg-card/60 p-5 sticky top-4">
-                <div className="text-sm font-semibold mb-4">Actions</div>
-                
-                {validationError && (
-                   <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-xs text-destructive flex gap-2">
-                      <AlertCircle className="h-4 w-4 shrink-0" />
-                      {validationError}
-                   </div>
-                )}
-
-                <div className="space-y-2">
-                  <Button
-                    className="w-full h-11"
-                    onClick={handleSubmit}
-                  >
-                    Save Figures
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    className="w-full h-11"
-                    onClick={() => {
-                      const next: Record<string, string | number> = {};
-                      PRESCRIPTION_FIELDS.forEach(f => {
-                          next[f.epsKey] = "";
-                          next[f.paperKey] = "";
-                      });
-                      OTHER_FIELDS.forEach(f => { next[f.key] = ""; });
-                      setValues(next);
-                      setValidationError(null);
-                      setHighlightMissing(false);
-                    }}
-                  >
-                    Reset All
-                  </Button>
+          <div className="hidden lg:block space-y-4">
+             <Card className="rounded-2xl border bg-card/60 p-5 shadow-sm sticky top-6">
+                <div className="text-sm font-semibold mb-4">Form Guide</div>
+                <div className="space-y-4 text-xs text-muted-foreground">
+                   <p><strong>0 Required:</strong> If no activity occurred for a specific metric, you must explicitly enter <code>0</code>.</p>
+                   <p><strong>NHS Prepayments:</strong> Ensure this matches the exact certificate cost (£32.05, £114.50, or £19.80). Validations enforce exact multiples.</p>
+                   <p><strong>FP57:</strong> Must be a multiple of £9.90.</p>
+                   <Separator />
+                   <p className="font-medium text-foreground">Need help?</p>
+                   <p>Contact Head Office or raise an IT ticket if forms fail to submit.</p>
                 </div>
-                
-                <Separator className="my-4" />
-                <div className="text-xs text-muted-foreground">
-                   Note: Variance reporting has been removed. Please ensure accuracy before saving.
-                </div>
-             </Card>
-             
-             <Card className="rounded-2xl border bg-card/60 p-5">
-               <div className="text-sm font-semibold mb-2">Nominations (Weekly)</div>
-               <div className="text-xs text-muted-foreground mb-3">
-                  Week ending {new Date().toLocaleDateString('en-GB')}
-               </div>
-               <div className="rounded-lg bg-background/50 p-3 flex justify-between items-center">
-                  <div>
-                    <div className="text-xs text-muted-foreground">Active</div>
-                    <div className="text-xl font-mono font-medium text-foreground">4,120</div>
-                  </div>
-                  <Badge className="bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 border-emerald-500/20 shadow-none">
-                    +12
-                  </Badge>
-               </div>
              </Card>
           </div>
         </div>
