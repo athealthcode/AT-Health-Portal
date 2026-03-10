@@ -19,7 +19,7 @@ const MOCK_RECONCILIATION = [
 export default function BankingReconciliation() {
   const { session } = useAuth();
   const isHeadOffice = session.scope.type === "headoffice";
-  const [pharmacy, setPharmacy] = useState(isHeadOffice ? "bowland" : session.scope.pharmacyId);
+  const [pharmacy, setPharmacy] = useState<string>(isHeadOffice ? "bowland" : session.scope.type === "pharmacy" ? session.scope.pharmacyId : "bowland");
   const [month, setMonth] = useState("2026-03");
 
   const totalExpected = MOCK_RECONCILIATION.reduce((acc, row) => acc + row.expected, 0);

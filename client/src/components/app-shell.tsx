@@ -17,7 +17,11 @@ import {
   ShieldCheck,
   ClipboardList,
   Wallet,
-  CheckSquare
+  CheckSquare,
+  Activity,
+  BriefcaseMedical,
+  Truck,
+  HeartPulse
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -43,6 +47,13 @@ export function AppShell({ children }: PropsWithChildren) {
 
   const navItems: NavItem[] = useMemo(
     () => [
+      { 
+         href: "/control-centre", 
+         label: "Control Centre", 
+         icon: Activity, 
+         testId: "link-nav-control-centre",
+         requiresRole: (r) => r === "Head Office Admin" || r === "Super Admin",
+      },
       { href: "/", label: "Dashboard", icon: LayoutDashboard, testId: "link-nav-dashboard" },
       { href: "/daily-figures", label: "Daily Figures", icon: FileText, testId: "link-nav-daily-figures" },
       { href: "/cashing-up", label: "Cashing Up", icon: Coins, testId: "link-nav-cashing-up" },
@@ -51,6 +62,12 @@ export function AppShell({ children }: PropsWithChildren) {
          label: "Bookkeeping", 
          icon: BookOpen, 
          testId: "link-nav-bookkeeping" 
+      },
+      {
+         href: "/incidents",
+         label: "Incidents",
+         icon: BriefcaseMedical,
+         testId: "link-nav-incidents",
       },
       {
         href: "/exceptions",
@@ -70,6 +87,18 @@ export function AppShell({ children }: PropsWithChildren) {
         label: "PQS Tracker",
         icon: ClipboardList,
         testId: "link-nav-pqs",
+      },
+      {
+        href: "/private-clinic",
+        label: "Private Clinic",
+        icon: HeartPulse,
+        testId: "link-nav-private-clinic",
+      },
+      {
+        href: "/stock-transfer",
+        label: "Stock Transfers",
+        icon: Truck,
+        testId: "link-nav-stock-transfer",
       },
       {
         href: "/banking-reconciliation",
@@ -101,7 +130,7 @@ export function AppShell({ children }: PropsWithChildren) {
       },
       {
         href: "/documents",
-        label: "Documents",
+        label: "Documents & SOPs",
         icon: Files,
         testId: "link-nav-documents",
       },
@@ -114,11 +143,18 @@ export function AppShell({ children }: PropsWithChildren) {
       },
       {
         href: "/admin",
-        label: "Settings",
+        label: "Platform Settings",
         icon: Settings,
         testId: "link-nav-admin",
         requiresRole: (r) => r === "Head Office Admin" || r === "Super Admin",
       },
+      {
+         href: "/onboarding",
+         label: "Org Onboarding",
+         icon: Building2,
+         testId: "link-nav-onboarding",
+         requiresRole: (r) => r === "Super Admin",
+      }
     ],
     [],
   );

@@ -15,7 +15,7 @@ const MOCK_MONTHS = [
 export default function MonthlyClose() {
   const { session } = useAuth();
   const isHeadOffice = session.scope.type === "headoffice";
-  const [pharmacy, setPharmacy] = useState(isHeadOffice ? "bowland" : session.scope.pharmacyId);
+  const [pharmacy, setPharmacy] = useState<string>(isHeadOffice ? "bowland" : session.scope.type === "pharmacy" ? session.scope.pharmacyId : "bowland");
   
   const [checks, setChecks] = useState({
     dailyFigures: true,

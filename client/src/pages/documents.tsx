@@ -110,7 +110,7 @@ export default function Documents() {
                 <Card className="p-4 rounded-2xl border bg-card/60 shadow-sm flex flex-col justify-center items-center text-center">
                    <div className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-2">Compliance Rate</div>
                    <div className="text-4xl font-bold font-mono text-emerald-600">75%</div>
-                   <Progress value={75} className="h-1.5 w-full max-w-[150px] mt-3" indicatorClassName="bg-emerald-500" />
+                   <Progress value={75} className="h-1.5 w-full max-w-[150px] mt-3" />
                 </Card>
                 <Card className="p-4 rounded-2xl border bg-card/60 shadow-sm flex flex-col justify-center items-center text-center">
                    <div className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-2">Pending Reading</div>

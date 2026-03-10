@@ -99,21 +99,21 @@ export default function Compliance() {
                      <span className="font-medium text-muted-foreground">Daily Figures On-Time Rate</span>
                      <span className="font-mono font-medium">{MOCK_DATA.metrics.dailyFigures}%</span>
                   </div>
-                  <Progress value={MOCK_DATA.metrics.dailyFigures} className="h-2" indicatorClassName={MOCK_DATA.metrics.dailyFigures >= 90 ? "bg-emerald-500" : "bg-amber-500"} />
+                  <Progress value={MOCK_DATA.metrics.dailyFigures} className="h-2" />
                </div>
                <div>
                   <div className="flex justify-between text-sm mb-1.5">
                      <span className="font-medium text-muted-foreground">Cashing Up On-Time Rate</span>
                      <span className="font-mono font-medium">{MOCK_DATA.metrics.cashingUp}%</span>
                   </div>
-                  <Progress value={MOCK_DATA.metrics.cashingUp} className="h-2" indicatorClassName={MOCK_DATA.metrics.cashingUp >= 90 ? "bg-emerald-500" : "bg-amber-500"} />
+                  <Progress value={MOCK_DATA.metrics.cashingUp} className="h-2" />
                </div>
                <div>
                   <div className="flex justify-between text-sm mb-1.5">
                      <span className="font-medium text-muted-foreground">Bookkeeping Completion</span>
                      <span className="font-mono font-medium">{MOCK_DATA.metrics.bookkeeping}%</span>
                   </div>
-                  <Progress value={MOCK_DATA.metrics.bookkeeping} className="h-2" indicatorClassName="bg-emerald-500" />
+                  <Progress value={MOCK_DATA.metrics.bookkeeping} className="h-2" />
                </div>
             </div>
           </Card>
@@ -159,7 +159,7 @@ export default function Compliance() {
                          </tr>
                       </thead>
                       <tbody className="divide-y">
-                         {MOCK_DATA.missedDates.filter(d => isHeadOffice || d.pharmacy === session.scope.pharmacyName).map((row, i) => (
+                         {MOCK_DATA.missedDates.filter(d => isHeadOffice || (session.scope.type === "pharmacy" && d.pharmacy === session.scope.pharmacyName)).map((row, i) => (
                             <tr key={i} className="hover:bg-muted/30 transition-colors">
                                <td className="p-3 font-medium">{row.date}</td>
                                {isHeadOffice && <td className="p-3">{row.pharmacy}</td>}

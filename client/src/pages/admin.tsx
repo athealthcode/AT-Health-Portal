@@ -136,6 +136,7 @@ export default function Admin() {
      setDeleteStep(0);
   };
 
+  const isHeadOffice = session.scope.type === "headoffice";
   const canManageUsers = session.role === "Head Office Admin" || session.role === "Super Admin";
   const canDeleteBranch = session.role === "Super Admin"; 
 

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ExternalLink, AlertTriangle, Clock, Calendar as CalendarIcon, FileWarning, Search, Filter } from "lucide-react";
+import { ExternalLink, AlertTriangle, Clock, Calendar as CalendarIcon, FileWarning, Search, Filter, CheckCircle2 } from "lucide-react";
 import { useAuth } from "@/state/auth";
 import { useLocation } from "wouter";
 
@@ -23,12 +23,14 @@ type Exception = {
 const MOCK_EXCEPTIONS: Exception[] = [
   { id: "e1", date: "2026-03-10", pharmacyId: "bowland", pharmacyName: "Bowland Pharmacy", type: "Daily Figures Missing", description: "Daily Figures not entered for today.", severity: "high", link: "/daily-figures" },
   { id: "e2", date: "2026-03-10", pharmacyId: "denton", pharmacyName: "Denton Pharmacy", type: "Cashing Up Missing", description: "Cashing Up not entered for today.", severity: "high", link: "/cashing-up" },
-  { id: "e3", date: "2026-03-09", pharmacyId: "wilmslow", pharmacyName: "Wilmslow Pharmacy", type: "Missing Invoice", description: "Banking entry missing locum invoice confirmation.", severity: "medium", link: "/cashing-up" },
+  { id: "e3", date: "2026-03-09", pharmacyId: "wilmslow", pharmacyName: "Wilmslow Pharmacy", type: "Missing Invoice", description: "Banking entry missing locum invoice confirmation.", severity: "medium", link: "/banking-reconciliation" },
   { id: "e4", date: "2026-03-01", pharmacyId: "bowland", pharmacyName: "Bowland Pharmacy", type: "Not Completed", description: "Manager marked Daily Figures as Not Completed.", severity: "low", link: "/daily-figures" },
   { id: "e5", date: "2026-03-05", pharmacyId: "denton", pharmacyName: "Denton Pharmacy", type: "Bookkeeping Incomplete", description: "Mandatory MYS items missing for current month.", severity: "medium", link: "/bookkeeping" },
   { id: "e6", date: "2026-02-28", pharmacyId: "wilmslow", pharmacyName: "Wilmslow Pharmacy", type: "Bonus Unapproved", description: "Bonus month (Feb) is locked but unapproved.", severity: "medium", link: "/bonus-performance" },
-  { id: "e7", date: "2026-03-08", pharmacyId: "bowland", pharmacyName: "Bowland Pharmacy", type: "Nominations Missing", description: "Nominations growth not updated for the week.", severity: "low", link: "/bonus-performance" },
-  { id: "e8", date: "2026-03-07", pharmacyId: "denton", pharmacyName: "Denton Pharmacy", type: "Problem Raised", description: "IT Ticket: Label printer offline.", severity: "low", link: "/" },
+  { id: "e7", date: "2026-03-08", pharmacyId: "bowland", pharmacyName: "Bowland Pharmacy", type: "PQS Overdue", description: "Asthma domain criteria overdue for submission.", severity: "high", link: "/pqs" },
+  { id: "e8", date: "2026-03-07", pharmacyId: "denton", pharmacyName: "Denton Pharmacy", type: "Unresolved Incident", description: "Fridge Temp Excursion open for > 48 hours.", severity: "high", link: "/incidents" },
+  { id: "e9", date: "2026-03-06", pharmacyId: "wilmslow", pharmacyName: "Wilmslow Pharmacy", type: "SOP Compliance", description: "3 Staff members overdue on Information Governance SOP.", severity: "medium", link: "/documents" },
+  { id: "e10", date: "2026-03-09", pharmacyId: "bowland", pharmacyName: "Bowland Pharmacy", type: "Stock Transfer", description: "Excess stock of Apixaban awaiting transfer action.", severity: "low", link: "/stock-transfer" }
 ];
 
 export default function Exceptions() {

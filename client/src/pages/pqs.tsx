@@ -45,7 +45,7 @@ export default function PQS() {
   const { session } = useAuth();
   const isHeadOffice = session.scope.type === "headoffice";
   const [year, setYear] = useState("2026/27");
-  const [pharmacy, setPharmacy] = useState(isHeadOffice ? "bowland" : session.scope.pharmacyId);
+  const [pharmacy, setPharmacy] = useState<string>(isHeadOffice ? "bowland" : session.scope.type === "pharmacy" ? session.scope.pharmacyId : "bowland");
 
   const calculateOverallProgress = () => {
     let total = 0;
@@ -148,7 +148,7 @@ export default function PQS() {
                              <span className="line-clamp-1" title={domain.name}>{domain.name}</span>
                              <span className="text-muted-foreground">{pct}%</span>
                           </div>
-                          <Progress value={pct} className="h-2" indicatorClassName={pct === 100 ? "bg-emerald-500" : "bg-primary"} />
+                          <Progress value={pct} className="h-2" />
                           <div className="text-xs text-muted-foreground">{done} of {total} criteria met</div>
                        </div>
                     );

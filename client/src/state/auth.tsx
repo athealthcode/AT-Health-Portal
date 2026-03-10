@@ -31,6 +31,7 @@ export type TrustedBrowser = {
   tokenHash: string; // simulating hash storage
   ipAddress: string;
   userAgent: string;
+  browserInfo?: { os?: string; browser?: string };
   createdAt: number;
   expiresAt: number;
   lastUsedAt: number;
