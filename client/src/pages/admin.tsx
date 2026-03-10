@@ -11,10 +11,11 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth, Role } from "@/state/auth";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Trash2, AlertTriangle, Shield, Clock, Monitor, Info, Lock, Link as LinkIcon, Save } from "lucide-react";
+import { Trash2, AlertTriangle, Shield, Clock, Monitor, Info, Lock, Link as LinkIcon, Save, Palette } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
+import { useOrg } from "@/state/org";
 
 type Pharmacy = {
   id: string;
@@ -31,6 +32,7 @@ type SharePointConfig = {
 export default function Admin() {
   const { toast } = useToast();
   const { users, inviteUser, deleteUser, session, trustedBrowsers, revokeTrustedBrowser } = useAuth();
+  const { settings, setSettings, modules, setModules } = useOrg();
   
   const [inviteOpen, setInviteOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState<{ type: 'user' | 'pharmacy', id: string } | null>(null);
@@ -64,17 +66,19 @@ export default function Admin() {
   });
 
   // Launch Control Settings
-  const [launchControl, setLaunchControl] = useState({
-    testMode: true,
-    dailyFigures: true,
-    cashingUp: true,
-    bookkeeping: true,
-    bonusPerformance: true,
-  });
+  const [launchControl, setLaunchControl] = useState(modules);
+
+  const [orgSettings, setOrgSettings] = useState(settings);
 
   const handleLaunchToggle = (key: string, val: boolean) => {
     setLaunchControl(s => ({ ...s, [key]: val }));
-    toast({ title: "Setting Updated", description: `${key} is now ${val ? "ON" : "OFF"}` });
+    setModules({ [key]: val });
+    toast({ title: "Module Updated", description: `${key} is now ${val ? "ON" : "OFF"}` });
+  };
+
+  const handleOrgSettingsSave = () => {
+     setSettings(orgSettings);
+     toast({ title: "Settings Saved", description: "Organisation details and branding updated." });
   };
 
   // Load Config
@@ -435,6 +439,95 @@ export default function Admin() {
            </TabsContent>
 
            {isHeadOffice && (
+              <TabsContent value="whitelabel">
+                 <Card className="rounded-2xl border bg-card/60 p-6 mb-6">
+                    <div className="flex items-center gap-2 mb-6 border-b pb-4">
+                       <Palette className="h-5 w-5 text-primary" />
+                       <div>
+                          <div className="font-semibold">Organisation Settings & White-Labelling</div>
+                          <div className="text-xs text-muted-foreground">Manage global organisation settings and customize platform appearance.</div>
+                       </div>
+                    </div>
+                    
+                    <div className="grid md:grid-cols-2 gap-8">
+                       <div className="space-y-4">
+                          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Brand Colors</div>
+                          <div className="space-y-4 bg-background/50 p-5 rounded-xl border">
+                             <div className="grid gap-2">
+                                <Label>Primary Color (Hex)</Label>
+                                <div className="flex gap-2">
+                                   <div className="w-10 h-10 rounded-md border" style={{ backgroundColor: orgSettings.primaryColor }}></div>
+                                   <Input value={orgSettings.primaryColor} onChange={(e) => setOrgSettings(s => ({ ...s, primaryColor: e.target.value }))} className="font-mono" />
+                                </div>
+                             </div>
+                             <div className="grid gap-2">
+                                <Label>Accent Color (Hex)</Label>
+                                <div className="flex gap-2">
+                                   <div className="w-10 h-10 rounded-md border" style={{ backgroundColor: orgSettings.accentColor }}></div>
+                                   <Input value={orgSettings.accentColor} onChange={(e) => setOrgSettings(s => ({ ...s, accentColor: e.target.value }))} className="font-mono" />
+                                </div>
+                             </div>
+                          </div>
+
+                          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-6">Organization Details</div>
+                          <div className="space-y-4 bg-background/50 p-5 rounded-xl border">
+                             <div className="grid gap-2">
+                                <Label>Portal Name</Label>
+                                <Input value={orgSettings.name} onChange={(e) => setOrgSettings(s => ({ ...s, name: e.target.value }))} />
+                             </div>
+                             <div className="grid gap-2">
+                                <Label>Email Sender Name</Label>
+                                <Input value={orgSettings.emailSender} onChange={(e) => setOrgSettings(s => ({ ...s, emailSender: e.target.value }))} />
+                             </div>
+                             <div className="grid gap-2">
+                                <Label>Custom Subdomain</Label>
+                                <div className="flex items-center gap-2">
+                                   <Input value={orgSettings.customDomain} onChange={(e) => setOrgSettings(s => ({ ...s, customDomain: e.target.value }))} className="text-right" />
+                                   <span className="text-muted-foreground text-sm">.pharmacy-portal.co.uk</span>
+                                </div>
+                             </div>
+                          </div>
+                       </div>
+
+                       <div className="space-y-4">
+                          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Logo & Assets</div>
+                          <div className="space-y-4 bg-background/50 p-5 rounded-xl border">
+                             <div className="grid gap-2">
+                                <Label>Primary Logo</Label>
+                                <div className="border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center text-center gap-2">
+                                   <div className="h-12 w-32 bg-muted rounded flex items-center justify-center text-xs text-muted-foreground">AT Health Logo</div>
+                                   <Button variant="outline" size="sm" className="mt-2">Upload New Logo</Button>
+                                   <p className="text-[10px] text-muted-foreground">PNG, SVG up to 2MB</p>
+                                </div>
+                             </div>
+                             <div className="grid gap-2">
+                                <Label>Favicon</Label>
+                                <div className="flex items-center gap-4">
+                                   <div className="h-10 w-10 bg-muted rounded border flex items-center justify-center text-[10px] text-muted-foreground">Icon</div>
+                                   <Button variant="outline" size="sm">Update Icon</Button>
+                                </div>
+                             </div>
+                          </div>
+
+                          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-6">Current Entitlements</div>
+                          <div className="space-y-4 bg-background/50 p-5 rounded-xl border">
+                             <div className="flex items-center justify-between">
+                                <Label>Plan Tier</Label>
+                                <Badge variant="secondary">{orgSettings.tier}</Badge>
+                             </div>
+                             <p className="text-xs text-muted-foreground">Entitlements are managed by Platform Administrators.</p>
+                          </div>
+
+                          <div className="mt-6 flex justify-end">
+                             <Button onClick={handleOrgSettingsSave}>Save Organization Settings</Button>
+                          </div>
+                       </div>
+                    </div>
+                 </Card>
+              </TabsContent>
+           )}
+
+           {isHeadOffice && (
               <TabsContent value="launch-control">
                  <Card className="rounded-2xl border bg-card/60 p-6">
                     <div className="flex items-center gap-2 mb-6 border-b pb-4">
@@ -638,7 +731,7 @@ export default function Admin() {
                             <div>
                                <div className="font-medium text-sm flex items-center gap-2">
                                   <Monitor className="h-4 w-4 text-primary" />
-                                  {tb.browserInfo}
+                                  {tb.browserInfo ? `${tb.browserInfo.browser || 'Unknown'} on ${tb.browserInfo.os || 'Unknown OS'}` : 'Unknown Device'}
                                </div>
                                <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
                                   <Clock className="h-3 w-3" />

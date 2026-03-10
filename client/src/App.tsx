@@ -27,6 +27,7 @@ import StockTransfer from "./pages/stock-transfer";
 import PrivateClinic from "./pages/private-clinic";
 import Onboarding from "./pages/onboarding";
 import { AuthProvider, useAuth } from "@/state/auth";
+import { OrgProvider } from "@/state/org";
 
 function GuardedRoute(props: {
   path: string;
@@ -77,10 +78,12 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <AuthProvider>
-          <Toaster />
-          <Router />
-        </AuthProvider>
+        <OrgProvider>
+          <AuthProvider>
+            <Toaster />
+            <Router />
+          </AuthProvider>
+        </OrgProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );

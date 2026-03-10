@@ -30,6 +30,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/state/auth";
+import { useOrg } from "@/state/org";
 import logo from "@/assets/at-health-logo.png";
 
 type NavItem = {
@@ -38,11 +39,13 @@ type NavItem = {
   icon: React.ComponentType<{ className?: string }>;
   testId: string;
   requiresRole?: (role: string | undefined) => boolean;
+  moduleKey?: keyof ReturnType<typeof useOrg>['modules'];
 };
 
 export function AppShell({ children }: PropsWithChildren) {
   const [location] = useLocation();
   const { session, signOut, selectStaff } = useAuth();
+  const { settings, modules } = useOrg();
   const [open, setOpen] = useState(false);
 
   const navItems: NavItem[] = useMemo(
@@ -159,7 +162,11 @@ export function AppShell({ children }: PropsWithChildren) {
     [],
   );
 
-  const visibleNav = navItems.filter((n) => (n.requiresRole ? n.requiresRole(session.role) : true));
+  const visibleNav = navItems.filter((n) => {
+    if (n.requiresRole && !n.requiresRole(session.role)) return false;
+    if (n.moduleKey && modules[n.moduleKey] === false) return false;
+    return true;
+  });
 
   const scopeLabel =
     session.scope.type === "pharmacy" ? session.scope.pharmacyName : "Head Office";
@@ -167,7 +174,11 @@ export function AppShell({ children }: PropsWithChildren) {
   const header = (
     <div className="flex flex-col gap-4">
       <div className="bg-primary/5 rounded-xl p-4 flex items-center justify-center">
-         <img src={logo} alt="AT Health" className="h-10 w-auto object-contain" />
+         {settings.logoUrl ? (
+            <img src={settings.logoUrl} alt={settings.name} className="h-10 w-auto object-contain" />
+         ) : (
+            <img src={logo} alt="AT Health" className="h-10 w-auto object-contain" />
+         )}
       </div>
 
       <div className="px-1">
@@ -256,7 +267,11 @@ export function AppShell({ children }: PropsWithChildren) {
           <div className="lg:hidden">
             <div className="surface rounded-2xl p-4">
               <div className="flex items-center justify-between">
-                 <img src={logo} alt="AT Health" className="h-8 w-auto object-contain" />
+                 {settings.logoUrl ? (
+                    <img src={settings.logoUrl} alt={settings.name} className="h-8 w-auto object-contain" />
+                 ) : (
+                    <img src={logo} alt="AT Health" className="h-8 w-auto object-contain" />
+                 )}
                 <Sheet open={open} onOpenChange={setOpen}>
                   <SheetTrigger asChild>
                     <Button variant="outline" className="h-10" data-testid="button-open-nav">
