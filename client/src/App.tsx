@@ -15,6 +15,7 @@ import Reports from "./pages/reports";
 import Documents from "./pages/documents";
 import Admin from "./pages/admin";
 import BonusPerformance from "./pages/bonus-performance";
+import AccessOverview from "./pages/access-overview";
 import { AuthProvider, useAuth } from "@/state/auth";
 
 function GuardedRoute(props: {
@@ -45,6 +46,7 @@ function Router() {
       <GuardedRoute path="/documents" component={Documents} />
       <GuardedRoute path="/admin" component={Admin} />
       <GuardedRoute path="/bonus-performance" component={BonusPerformance} />
+      <GuardedRoute path="/access-overview" component={AccessOverview} />
 
       <Route component={NotFound} />
     </Switch>

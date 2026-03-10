@@ -12,6 +12,7 @@ import {
   ChevronDown,
   BookOpen,
   Award,
+  Shield,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -65,6 +66,13 @@ export function AppShell({ children }: PropsWithChildren) {
         label: "Documents",
         icon: Files,
         testId: "link-nav-documents",
+      },
+      {
+        href: "/access-overview",
+        label: "Access Overview",
+        icon: Shield,
+        testId: "link-nav-access",
+        requiresRole: (r) => r === "Head Office Admin" || r === "Super Admin",
       },
       {
         href: "/admin",
