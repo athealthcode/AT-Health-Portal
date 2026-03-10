@@ -15,7 +15,9 @@ import {
   ArrowDownRight,
   Calendar,
   BarChart3,
-  Users
+  Users,
+  ShieldCheck,
+  ClipboardList
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
@@ -191,6 +193,59 @@ export default function Dashboard() {
                     </div>
                  </Card>
               </div>
+
+              {/* COMPLIANCE WIDGET FOR HEAD OFFICE */}
+              <div className="grid gap-6 lg:grid-cols-2 mt-6">
+                 <Card className="p-6 rounded-2xl border bg-card/60 shadow-sm">
+                    <div className="flex items-center justify-between mb-4">
+                       <h3 className="font-semibold flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-primary" /> Submission Compliance</h3>
+                       <Link href="/compliance">
+                          <Button variant="ghost" size="sm" className="h-8">View All <ArrowRight className="h-3 w-3 ml-1" /></Button>
+                       </Link>
+                    </div>
+                    <div className="flex items-center gap-6 mb-4">
+                       <div className="flex flex-col">
+                          <span className="text-3xl font-mono font-bold text-emerald-600">88%</span>
+                          <span className="text-xs text-muted-foreground uppercase tracking-wider">Network Score</span>
+                       </div>
+                       <div className="flex-1 space-y-2">
+                          <div>
+                             <div className="flex justify-between text-xs mb-1"><span className="text-muted-foreground">Daily Figures</span><span className="font-medium">94%</span></div>
+                             <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden"><div className="h-full bg-emerald-500 w-[94%]" /></div>
+                          </div>
+                          <div>
+                             <div className="flex justify-between text-xs mb-1"><span className="text-muted-foreground">Cashing Up</span><span className="font-medium">89%</span></div>
+                             <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden"><div className="h-full bg-amber-500 w-[89%]" /></div>
+                          </div>
+                       </div>
+                    </div>
+                 </Card>
+
+                 <Card className="p-6 rounded-2xl border bg-card/60 shadow-sm">
+                    <div className="flex items-center justify-between mb-4">
+                       <h3 className="font-semibold flex items-center gap-2"><ClipboardList className="h-4 w-4 text-primary" /> PQS Readiness (2026/27)</h3>
+                       <Link href="/pqs">
+                          <Button variant="ghost" size="sm" className="h-8">Tracker <ArrowRight className="h-3 w-3 ml-1" /></Button>
+                       </Link>
+                    </div>
+                    <div className="flex items-center gap-6 mb-4">
+                       <div className="flex flex-col">
+                          <span className="text-3xl font-mono font-bold text-primary">45%</span>
+                          <span className="text-xs text-muted-foreground uppercase tracking-wider">Network Avg</span>
+                       </div>
+                       <div className="flex-1 grid grid-cols-2 gap-2 text-sm">
+                          <div className="p-2 bg-background/50 rounded-lg border text-center">
+                             <div className="font-mono font-bold text-amber-500">12</div>
+                             <div className="text-[10px] text-muted-foreground uppercase">Overdue Actions</div>
+                          </div>
+                          <div className="p-2 bg-background/50 rounded-lg border text-center">
+                             <div className="font-mono font-bold text-red-500">5</div>
+                             <div className="text-[10px] text-muted-foreground uppercase">Missing Evidence</div>
+                          </div>
+                       </div>
+                    </div>
+                 </Card>
+              </div>
            </>
         ) : (
            <>
@@ -312,6 +367,57 @@ export default function Dashboard() {
                                 <ArrowUpRight className="h-3 w-3 mr-1"/>
                                 {myPharmacyMetrics.nominations.weeklyPct} weekly ({myPharmacyMetrics.nominations.weeklyNum})
                              </div>
+                          </div>
+                       </div>
+                    </div>
+                 </Card>
+              </div>
+
+              {/* COMPLIANCE & PQS FOR PHARMACY */}
+              <div className="grid gap-6 lg:grid-cols-2 mt-2">
+                 <Card className="p-5 rounded-2xl border bg-card/60 shadow-sm">
+                    <div className="flex items-center justify-between mb-3">
+                       <h3 className="font-semibold flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-primary" /> Compliance Score</h3>
+                       <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none">96%</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-4">You are currently ranked #1 out of 3 pharmacies for on-time submissions.</p>
+                    <div className="grid grid-cols-3 gap-2">
+                       <div className="p-2 bg-background/50 rounded-lg border text-center">
+                          <div className="font-mono font-bold text-emerald-600">100%</div>
+                          <div className="text-[10px] text-muted-foreground mt-1 leading-tight">Daily<br/>Figures</div>
+                       </div>
+                       <div className="p-2 bg-background/50 rounded-lg border text-center">
+                          <div className="font-mono font-bold text-emerald-600">92%</div>
+                          <div className="text-[10px] text-muted-foreground mt-1 leading-tight">Cashing<br/>Up</div>
+                       </div>
+                       <div className="p-2 bg-background/50 rounded-lg border text-center">
+                          <div className="font-mono font-bold text-emerald-600">100%</div>
+                          <div className="text-[10px] text-muted-foreground mt-1 leading-tight">Book-<br/>keeping</div>
+                       </div>
+                    </div>
+                 </Card>
+                 
+                 <Card className="p-5 rounded-2xl border bg-card/60 shadow-sm">
+                    <div className="flex items-center justify-between mb-3">
+                       <h3 className="font-semibold flex items-center gap-2"><ClipboardList className="h-4 w-4 text-primary" /> PQS 2026/27</h3>
+                       <Link href="/pqs"><Button variant="ghost" size="sm" className="h-7 text-xs px-2">Open <ArrowRight className="w-3 h-3 ml-1"/></Button></Link>
+                    </div>
+                    <div className="flex items-center gap-4">
+                       <div className="relative w-16 h-16 shrink-0 flex items-center justify-center">
+                          <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                             <path className="text-muted/30" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" />
+                             <path className="text-primary" strokeDasharray="60, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" />
+                          </svg>
+                          <div className="absolute text-sm font-bold text-primary">60%</div>
+                       </div>
+                       <div className="flex-1 space-y-1.5">
+                          <div className="flex justify-between text-xs items-center p-1.5 bg-background/50 rounded border">
+                             <span className="text-muted-foreground">In Progress</span>
+                             <span className="font-medium">4 criteria</span>
+                          </div>
+                          <div className="flex justify-between text-xs items-center p-1.5 bg-background/50 rounded border">
+                             <span className="text-muted-foreground">Not Started</span>
+                             <span className="font-medium">2 criteria</span>
                           </div>
                        </div>
                     </div>

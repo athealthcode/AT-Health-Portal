@@ -1,0 +1,363 @@
+Evolve AT Health Portal from an internal intranet into a scalable multi-tenant pharmacy operations platform, with AT Health as the first organisation.
+
+Do not rewrite the whole app unless necessary. Extend the current architecture so it is suitable for internal use now and future resale to other pharmacy groups.
+
+CORE PRODUCT DIRECTION
+Build this as a multi-tenant pharmacy operations platform where:
+- one platform can host multiple organisations
+- each organisation can have multiple pharmacies
+- each pharmacy can have users, settings, roles, dashboards, reports, documents, templates, and permissions
+- AT Health is the first tenant/organisation
+
+1) MULTI-TENANT FOUNDATION
+Add data structure and permissions for:
+- Platform
+- Organisation
+- Pharmacy
+- User
+- Staff identity
+- Role
+- Module access
+- Audit logs per organisation
+Ensure strict tenant separation so all records are organisation-scoped and queries are filtered correctly.
+
+2) PLATFORM ADMIN VS ORGANISATION ADMIN
+Create two admin levels:
+- Platform Admin
+  - manages organisations, packages, feature toggles, global templates, white-labelling, subscription readiness
+- Organisation Admin
+  - manages their own pharmacies, users, templates, settings, reports, targets, and workflows
+
+AT Health should operate as an organisation tenant, while the platform supports future additional pharmacy groups.
+
+3) FEATURE TOGGLES / MODULAR PRODUCT
+Create a feature toggle system that can be enabled or disabled per organisation and per pharmacy.
+Include toggles for:
+- Daily Figures
+- Cashing Up
+- Banking
+- Bookkeeping
+- Documents
+- Reports
+- Audit Logs
+- Bonus & Performance
+- PQS
+- Exceptions
+- Launch Control
+- Monthly Close
+- SOP Acknowledgements
+- Banking Reconciliation
+- Private Clinic
+- Targets & Performance
+This should allow future packaging and commercial tiers.
+
+4) TEMPLATE ENGINE
+Create reusable templates for:
+- Daily Figures structure
+- Service categories
+- Bookkeeping checklists
+- Bonus structures
+- Dashboard KPI layouts
+- Report layouts
+- Pharmacy setup
+- Working days
+- Targets
+- User roles
+Templates should be clonable and editable by organisation admins.
+
+5) WHITE LABELLING
+Add organisation branding support:
+- logo upload
+- colour theme
+- organisation name
+- email sender name
+- PDF branding
+- optional custom domain/subdomain support later
+
+6) ACCESS CONTROL AND LOGIN ARCHITECTURE
+Keep the strict two-layer access model:
+Layer 1 = email account access
+Layer 2 = person identity by PIN
+
+Enforce current email-to-scope mapping for AT Health:
+- ahmed@at-health.co.uk = Ahmed / Master only
+- info@at-health.co.uk = Head Office Admin only
+- finance@at-health.co.uk = shared Finance login with finance staff picker
+- pharmacy emails are branch-only
+
+Requirements:
+- Ahmed login shows Ahmed only
+- Head Office email only shows Head Office staff identities
+- Finance only shows Finance identities
+- Pharmacy emails only show that branch’s staff identities
+- No registration or public sign-up
+- Separate branch session and user session
+- Log out of User = drops PIN identity only
+- Log out of Branch = drops full email session
+- OTP via mock/live auth mode
+- Microsoft 365 SMTP ready
+- Auth Mode toggle in Launch Control:
+  - Mock
+  - SMTP Live
+
+7) DASHBOARDS
+Improve dashboards for both operations and performance.
+
+Global dashboard requirements:
+- Quick buttons: Submit Daily Figures, Submit Cash Up
+- Remove Manage Bonuses button
+- Use varied colours matching theme
+- Rename Items Dispensed to Total Prescriptions/Items
+- Colour-code each branch consistently
+- Show:
+  - Total number of nominations
+  - weekly nominations growth (green positive, red negative)
+  - % increase vs last month
+  - absolute increase vs last month
+- Head Office/Ahmed can see all stores
+- Pharmacies see their own store
+
+Add dashboard comparison metrics:
+- current month to date
+- previous month comparison
+- league tables by pharmacy
+
+8) SUBMISSION COMPLIANCE DASHBOARD
+Add a compliance widget and full compliance page.
+
+Track per pharmacy:
+- Daily Figures on-time submission rate
+- Cashing Up on-time submission rate
+- Bookkeeping completion rate
+- Missing submission count
+- Late submission count
+- Marked not completed count
+- Authorised exception count
+
+Create a monthly Compliance Score out of 100.
+Display:
+- compliance score this month
+- comparison vs last month
+- red/amber/green status
+- league table by pharmacy
+- drill down to missed dates and reasons
+
+Add this to:
+- dashboard summary
+- reports
+- exceptions view
+
+9) DAILY FIGURES
+Retain current functionality and extend it with:
+- validation highlighting in red on exact invalid fields
+- historical viewing by trading date on the same page
+- trading date red/green key
+- manager-only “Mark as not completed” with approval workflow
+- month-to-date summary boxes for:
+  - Total Prescriptions/Items
+  - Total NMS
+  - Total DMS
+  - Hypertension Case Finding
+  - ABPM
+  - Contraception
+  - Vaccinations
+  - Local Services
+Each summary box must also show previous month comparison.
+
+NHS Prepayment must validate as multiples of:
+- £32.05
+- £114.50
+- £19.80
+
+10) CASHING UP + BANKING + RECONCILIATION
+Retain current functionality and extend it with:
+- historical date viewing
+- red/green trading date key
+- manager-only “Mark as not completed” with authorisation
+- rename To be banked → To be banked (Cash)
+- month-to-date cash in store
+- Banking movement section:
+  - Bank
+  - Locum Payout
+  - bank location if banked
+  - locum full name if payout
+  - locum invoice uploaded checkbox
+- No VAT category
+- mini audit trail snapshot
+
+Add Banking Reconciliation module:
+- expected cash
+- banked cash
+- remaining cash
+- unreconciled difference
+- month-to-date reconciliation status
+- audit history
+
+11) BOOKKEEPING
+Retain current functionality and extend:
+- condensed checklist layout
+- collapsible sections
+- MYS & In House first
+- tri-state completion:
+  - tick = complete
+  - cross = not used this month
+  - blank = not done
+- Save only selected rows
+- pharmacy users cannot edit saved rows
+- Head Office can amend
+- historical month view
+- section completion %
+- total completion %
+- template editor for Head Office
+- assign checklist templates to pharmacies
+
+12) BONUS & PERFORMANCE
+Retain current structure and extend:
+- NHS Bonus
+- Private Bonus
+- mandatory nominations gate requiring net positive monthly nominations
+- month-by-month cost versioning
+- copy previous month costs into new month
+- historic cost CSV export
+- Save and Lock by month
+- audited unlocks
+- historical month view
+- full transaction log
+- private bonus “Other” replaced with addable expense lines
+- private sales CSV upload parses and summarises categories sold
+- private bonus fixed at 20%
+- working days calculated automatically from configured pharmacy working days
+- all service costs list present and scrollable
+
+13) PQS MODULE
+Add a full PQS module per pharmacy and per year.
+Include:
+- PQS year selector
+- pharmacy selector
+- domains and criteria
+- status:
+  - not started
+  - in progress
+  - completed
+  - evidence uploaded
+  - submitted
+- due dates
+- owner
+- evidence/document upload
+- completion %
+- overdue items
+- head office review
+- audit trail
+- historic year comparison
+
+Add dashboard PQS widgets:
+- PQS completion %
+- overdue actions
+- evidence missing
+- readiness status by pharmacy
+
+14) SOP ACKNOWLEDGEMENT
+Add optional SOP and document acknowledgement module:
+- publish document
+- assign to pharmacies/users
+- track read status
+- acknowledgement date
+- overdue acknowledgements
+- export acknowledgement report
+
+15) EXCEPTIONS / OVERSIGHT
+Retain and improve Exceptions page:
+- Daily Figures not entered
+- Cashing Up not entered
+- Bookkeeping incomplete
+- Nominations not updated
+- Bonus month not approved
+- PQS overdue
+- Raised problems awaiting response
+- Banking entries missing invoice confirmation
+- Days or months marked not completed
+Add filters:
+- today
+- this week
+- this month
+- pharmacy
+- all pharmacies
+
+16) TARGETS & PERFORMANCE
+Add editable monthly targets per pharmacy for:
+- nominations
+- NMS
+- Pharmacy First
+- contraception
+- vaccinations
+- private revenue
+- gross profit
+- bookkeeping completion
+Show target vs actual on dashboard and reports.
+
+17) MONTHLY CLOSE WORKFLOW
+Add a monthly close workflow per pharmacy:
+- all Daily Figures complete
+- all Cashing Up complete
+- bookkeeping completed
+- banking reconciled
+- bonus reviewed
+- PQS checked
+- reports generated
+- month closed
+Once closed, pharmacy users cannot alter that month unless Head Office reopens it.
+
+18) DOCUMENTS / INTEGRATIONS
+Retain SharePoint per pharmacy.
+Create an integration settings layer for:
+- SMTP
+- SharePoint
+- CSV imports
+- future NHS and PMR integrations
+- future API integrations
+
+19) ARCHIVE INSTEAD OF DELETE
+Support archive for pharmacies and users.
+Keep strict deletion safeguards for irreversible delete.
+Only Ahmed should be able to perform critical destructive actions with Master PIN and confirmation.
+
+20) EXPORTS / BACKUPS / LAUNCH CONTROL
+Retain Launch Control and extend it.
+Show:
+- module toggles
+- auth mode
+- OTP status
+- last backup timestamp
+- last export generated
+- last login audit
+- last email alert
+Add exports:
+- CSV per module
+- PDF summary per module
+- monthly pack export per pharmacy
+- audit log export
+- bonus export
+- cost history export
+- PQS export
+
+21) PRODUCT READINESS
+Prepare the platform for future resale by supporting:
+- organisation onboarding wizard
+- package tiers
+- module entitlements
+- user limits
+- pharmacy limits
+- subscription readiness
+- customer-specific branding
+- customer-specific templates
+
+22) ANALYTICS
+Add internal product analytics for Platform Admin:
+- module usage
+- most used features
+- login frequency
+- missing submission trends
+- export frequency
+- exception frequency
+
+Keep the UI professional, clean, blue/white themed, readable, and pharmacy focused. Do not remove any existing working behaviour unless replaced with a stronger version.

@@ -14,6 +14,10 @@ import {
   Award,
   Shield,
   AlertTriangle,
+  ShieldCheck,
+  ClipboardList,
+  Wallet,
+  CheckSquare
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -54,6 +58,32 @@ export function AppShell({ children }: PropsWithChildren) {
         icon: AlertTriangle,
         testId: "link-nav-exceptions",
         requiresRole: (r) => r === "Head Office Admin" || r === "Super Admin",
+      },
+      {
+        href: "/compliance",
+        label: "Compliance",
+        icon: ShieldCheck,
+        testId: "link-nav-compliance",
+      },
+      {
+        href: "/pqs",
+        label: "PQS Tracker",
+        icon: ClipboardList,
+        testId: "link-nav-pqs",
+      },
+      {
+        href: "/banking-reconciliation",
+        label: "Banking Recon",
+        icon: Wallet,
+        testId: "link-nav-banking-recon",
+        requiresRole: (r) => r === "Finance" || r === "Head Office Admin" || r === "Super Admin",
+      },
+      {
+        href: "/monthly-close",
+        label: "Monthly Close",
+        icon: CheckSquare,
+        testId: "link-nav-monthly-close",
+        requiresRole: (r) => r === "Pharmacy Manager" || r === "Head Office Admin" || r === "Super Admin",
       },
       {
         href: "/reports",

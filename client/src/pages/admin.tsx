@@ -159,6 +159,7 @@ export default function Admin() {
               <TabsTrigger value="users">Users</TabsTrigger>
               <TabsTrigger value="pharmacies">Pharmacies</TabsTrigger>
               <TabsTrigger value="documents">Documents</TabsTrigger>
+              <TabsTrigger value="targets">Targets</TabsTrigger>
               {isHeadOffice && <TabsTrigger value="launch-control">Launch Control</TabsTrigger>}
            </TabsList>
 
@@ -521,6 +522,125 @@ export default function Admin() {
               </TabsContent>
            )}
         </Tabs>
+
+           <Card className="rounded-2xl border bg-card/60 p-6 shadow-sm">
+              <div className="flex items-center gap-3 mb-6 pb-4 border-b">
+                 <Shield className="h-5 w-5 text-primary" />
+                 <div>
+                    <h3 className="font-semibold text-lg">Performance Targets</h3>
+                    <p className="text-sm text-muted-foreground">Set monthly targets per pharmacy.</p>
+                 </div>
+              </div>
+              <div className="grid md:grid-cols-2 gap-6">
+                 <div className="space-y-4">
+                    <div className="flex justify-between items-center bg-background/50 p-3 rounded-lg border">
+                       <div>
+                          <Label className="font-medium">Total Prescriptions/Items</Label>
+                          <div className="text-xs text-muted-foreground">Target monthly volume</div>
+                       </div>
+                       <Input className="w-24 text-right" defaultValue="10000" />
+                    </div>
+                    <div className="flex justify-between items-center bg-background/50 p-3 rounded-lg border">
+                       <div>
+                          <Label className="font-medium">NMS Target</Label>
+                          <div className="text-xs text-muted-foreground">New Medicine Services</div>
+                       </div>
+                       <Input className="w-24 text-right" defaultValue="100" />
+                    </div>
+                    <div className="flex justify-between items-center bg-background/50 p-3 rounded-lg border">
+                       <div>
+                          <Label className="font-medium">Pharmacy First</Label>
+                          <div className="text-xs text-muted-foreground">Consultations target</div>
+                       </div>
+                       <Input className="w-24 text-right" defaultValue="50" />
+                    </div>
+                 </div>
+                 <div className="space-y-4">
+                    <div className="flex justify-between items-center bg-background/50 p-3 rounded-lg border">
+                       <div>
+                          <Label className="font-medium">Nominations Growth</Label>
+                          <div className="text-xs text-muted-foreground">Target net positive</div>
+                       </div>
+                       <Input className="w-24 text-right" defaultValue="50" />
+                    </div>
+                    <div className="flex justify-between items-center bg-background/50 p-3 rounded-lg border">
+                       <div>
+                          <Label className="font-medium">Private Revenue</Label>
+                          <div className="text-xs text-muted-foreground">Monthly target (£)</div>
+                       </div>
+                       <Input className="w-24 text-right" defaultValue="2500" />
+                    </div>
+                    <div className="flex justify-between items-center bg-background/50 p-3 rounded-lg border">
+                       <div>
+                          <Label className="font-medium">Compliance Score</Label>
+                          <div className="text-xs text-muted-foreground">Minimum acceptable score</div>
+                       </div>
+                       <Input className="w-24 text-right" defaultValue="90" />
+                    </div>
+                 </div>
+              </div>
+           </Card>
+        </TabsContent>
+
+        <TabsContent value="targets" className="space-y-6">
+           <Card className="rounded-2xl border bg-card/60 p-6 shadow-sm">
+              <div className="flex items-center gap-3 mb-6 pb-4 border-b">
+                 <Shield className="h-5 w-5 text-primary" />
+                 <div>
+                    <h3 className="font-semibold text-lg">Performance Targets</h3>
+                    <p className="text-sm text-muted-foreground">Set monthly targets per pharmacy.</p>
+                 </div>
+              </div>
+              <div className="grid md:grid-cols-2 gap-6">
+                 <div className="space-y-4">
+                    <div className="flex justify-between items-center bg-background/50 p-3 rounded-lg border">
+                       <div>
+                          <Label className="font-medium">Total Prescriptions/Items</Label>
+                          <div className="text-xs text-muted-foreground">Target monthly volume</div>
+                       </div>
+                       <Input className="w-24 text-right" defaultValue="10000" />
+                    </div>
+                    <div className="flex justify-between items-center bg-background/50 p-3 rounded-lg border">
+                       <div>
+                          <Label className="font-medium">NMS Target</Label>
+                          <div className="text-xs text-muted-foreground">New Medicine Services</div>
+                       </div>
+                       <Input className="w-24 text-right" defaultValue="100" />
+                    </div>
+                    <div className="flex justify-between items-center bg-background/50 p-3 rounded-lg border">
+                       <div>
+                          <Label className="font-medium">Pharmacy First</Label>
+                          <div className="text-xs text-muted-foreground">Consultations target</div>
+                       </div>
+                       <Input className="w-24 text-right" defaultValue="50" />
+                    </div>
+                 </div>
+                 <div className="space-y-4">
+                    <div className="flex justify-between items-center bg-background/50 p-3 rounded-lg border">
+                       <div>
+                          <Label className="font-medium">Nominations Growth</Label>
+                          <div className="text-xs text-muted-foreground">Target net positive</div>
+                       </div>
+                       <Input className="w-24 text-right" defaultValue="50" />
+                    </div>
+                    <div className="flex justify-between items-center bg-background/50 p-3 rounded-lg border">
+                       <div>
+                          <Label className="font-medium">Private Revenue</Label>
+                          <div className="text-xs text-muted-foreground">Monthly target (£)</div>
+                       </div>
+                       <Input className="w-24 text-right" defaultValue="2500" />
+                    </div>
+                    <div className="flex justify-between items-center bg-background/50 p-3 rounded-lg border">
+                       <div>
+                          <Label className="font-medium">Compliance Score</Label>
+                          <div className="text-xs text-muted-foreground">Minimum acceptable score</div>
+                       </div>
+                       <Input className="w-24 text-right" defaultValue="90" />
+                    </div>
+                 </div>
+              </div>
+           </Card>
+        </TabsContent>
 
         {/* MASTER PIN DELETE DIALOG */}
         <Dialog open={!!deleteConfirmOpen} onOpenChange={(o) => !o && setDeleteConfirmOpen(null)}>

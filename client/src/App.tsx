@@ -17,6 +17,10 @@ import Admin from "./pages/admin";
 import Exceptions from "./pages/exceptions";
 import BonusPerformance from "./pages/bonus-performance";
 import AccessOverview from "./pages/access-overview";
+import Compliance from "./pages/compliance";
+import PQS from "./pages/pqs";
+import BankingReconciliation from "./pages/banking-reconciliation";
+import MonthlyClose from "./pages/monthly-close";
 import { AuthProvider, useAuth } from "@/state/auth";
 
 function GuardedRoute(props: {
@@ -49,6 +53,10 @@ function Router() {
       <GuardedRoute path="/exceptions" component={Exceptions} />
       <GuardedRoute path="/bonus-performance" component={BonusPerformance} />
       <GuardedRoute path="/access-overview" component={AccessOverview} />
+      <GuardedRoute path="/compliance" component={Compliance} />
+      <GuardedRoute path="/pqs" component={PQS} />
+      <GuardedRoute path="/banking-reconciliation" component={BankingReconciliation} />
+      <GuardedRoute path="/monthly-close" component={MonthlyClose} />
 
       <Route component={NotFound} />
     </Switch>
