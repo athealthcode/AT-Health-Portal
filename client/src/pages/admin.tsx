@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Trash2, AlertTriangle, Shield, Clock, Monitor, Info, Lock, Link as LinkIcon, Save } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
 
 type Pharmacy = {
   id: string;
@@ -61,6 +62,20 @@ export default function Admin() {
     wilmslow: { embed: "https://www.microsoft.com/en-gb/microsoft-365/sharepoint/collaboration", fallback: "https://www.microsoft.com/en-gb/microsoft-365/sharepoint/collaboration" },
     headoffice: { embed: "https://www.microsoft.com/en-gb/microsoft-365/sharepoint/collaboration", fallback: "https://www.microsoft.com/en-gb/microsoft-365/sharepoint/collaboration" }
   });
+
+  // Launch Control Settings
+  const [launchControl, setLaunchControl] = useState({
+    testMode: true,
+    dailyFigures: true,
+    cashingUp: true,
+    bookkeeping: true,
+    bonusPerformance: true,
+  });
+
+  const handleLaunchToggle = (key: string, val: boolean) => {
+    setLaunchControl(s => ({ ...s, [key]: val }));
+    toast({ title: "Setting Updated", description: `${key} is now ${val ? "ON" : "OFF"}` });
+  };
 
   // Load Config
   useEffect(() => {
@@ -140,10 +155,11 @@ export default function Admin() {
         </div>
         
         <Tabs defaultValue="users" className="w-full">
-           <TabsList className="grid w-full max-w-md grid-cols-3 mb-4">
+           <TabsList className="flex w-full max-w-[600px] mb-4 flex-wrap">
               <TabsTrigger value="users">Users</TabsTrigger>
               <TabsTrigger value="pharmacies">Pharmacies</TabsTrigger>
               <TabsTrigger value="documents">Documents</TabsTrigger>
+              {isHeadOffice && <TabsTrigger value="launch-control">Launch Control</TabsTrigger>}
            </TabsList>
 
            <TabsContent value="users" className="grid gap-3 lg:grid-cols-2">
@@ -415,6 +431,95 @@ export default function Admin() {
                 </div>
              </Card>
            </TabsContent>
+
+           {isHeadOffice && (
+              <TabsContent value="launch-control">
+                 <Card className="rounded-2xl border bg-card/60 p-6">
+                    <div className="flex items-center gap-2 mb-6 border-b pb-4">
+                       <Shield className="h-5 w-5 text-primary" />
+                       <div>
+                          <div className="font-semibold">Launch Control</div>
+                          <div className="text-xs text-muted-foreground">Manage module availability and live environment status.</div>
+                       </div>
+                    </div>
+                    
+                    <div className="grid md:grid-cols-2 gap-8">
+                       <div className="space-y-4">
+                          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Module Toggles</div>
+                          <div className="space-y-4 bg-background/50 p-5 rounded-xl border">
+                             <div className="flex items-center justify-between">
+                                <div>
+                                   <Label className="text-sm font-medium">Daily Figures</Label>
+                                   <div className="text-[10px] text-muted-foreground mt-0.5">Enable the Daily Figures form for pharmacies</div>
+                                </div>
+                                <Switch checked={launchControl.dailyFigures} onCheckedChange={(v) => handleLaunchToggle('dailyFigures', v)} />
+                             </div>
+                             <Separator />
+                             <div className="flex items-center justify-between">
+                                <div>
+                                   <Label className="text-sm font-medium">Cashing Up</Label>
+                                   <div className="text-[10px] text-muted-foreground mt-0.5">Enable the Cashing Up form for pharmacies</div>
+                                </div>
+                                <Switch checked={launchControl.cashingUp} onCheckedChange={(v) => handleLaunchToggle('cashingUp', v)} />
+                             </div>
+                             <Separator />
+                             <div className="flex items-center justify-between">
+                                <div>
+                                   <Label className="text-sm font-medium">Bookkeeping</Label>
+                                   <div className="text-[10px] text-muted-foreground mt-0.5">Enable the monthly checklist</div>
+                                </div>
+                                <Switch checked={launchControl.bookkeeping} onCheckedChange={(v) => handleLaunchToggle('bookkeeping', v)} />
+                             </div>
+                             <Separator />
+                             <div className="flex items-center justify-between">
+                                <div>
+                                   <Label className="text-sm font-medium">Bonus & Performance</Label>
+                                   <div className="text-[10px] text-muted-foreground mt-0.5">Enable the bonus calculator and approval flow</div>
+                                </div>
+                                <Switch checked={launchControl.bonusPerformance} onCheckedChange={(v) => handleLaunchToggle('bonusPerformance', v)} />
+                             </div>
+                          </div>
+
+                          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-6">Environment</div>
+                          <div className="space-y-3 bg-amber-500/5 p-5 rounded-xl border border-amber-500/20">
+                             <div className="flex items-center justify-between">
+                                <div>
+                                   <Label className="text-sm font-medium text-amber-900">Live Mode</Label>
+                                   <div className="text-[10px] text-amber-700 mt-0.5">Disables mock data. Connects to production DB.</div>
+                                </div>
+                                <Switch checked={!launchControl.testMode} onCheckedChange={(v) => handleLaunchToggle('testMode', !v)} />
+                             </div>
+                          </div>
+                       </div>
+
+                       <div className="space-y-4">
+                          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">System Diagnostics</div>
+                          <div className="space-y-5 bg-background/50 p-5 rounded-xl border">
+                             <div className="flex justify-between items-center text-sm">
+                                <span className="text-muted-foreground font-medium">OTP Delivery Status</span>
+                                <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-emerald-200">Operational</Badge>
+                             </div>
+                             <Separator />
+                             <div className="flex justify-between items-center text-sm">
+                                <span className="text-muted-foreground font-medium">Last Backup</span>
+                                <span className="font-mono text-xs">2026-03-10 03:00 AM</span>
+                             </div>
+                             <Separator />
+                             <div className="flex justify-between items-center text-sm">
+                                <span className="text-muted-foreground font-medium">Last Auth Audit Log</span>
+                                <span className="font-mono text-xs">2026-03-10 10:45 AM</span>
+                             </div>
+                             <Separator />
+                             <div className="flex justify-between items-center text-sm">
+                                <span className="text-muted-foreground font-medium">Last Email Alert</span>
+                                <span className="font-mono text-xs">2026-03-10 09:30 AM</span>
+                             </div>
+                          </div>
+                       </div>
+                    </div>
+                 </Card>
+              </TabsContent>
+           )}
         </Tabs>
 
         {/* MASTER PIN DELETE DIALOG */}
@@ -465,33 +570,28 @@ export default function Admin() {
                 {userTrustedBrowsers.length === 0 ? (
                    <div className="text-sm text-muted-foreground">No active trusted devices.</div>
                 ) : (
-                   <div className="grid gap-3">
-                      {userTrustedBrowsers.map(tb => (
-                         <div key={tb.id} className="flex items-start justify-between rounded-lg border p-3 text-sm">
+                   <div className="space-y-3">
+                      {userTrustedBrowsers.map((tb, idx) => (
+                         <div key={idx} className="flex items-center justify-between p-3 border rounded-xl bg-muted/30">
                             <div>
-                               <div className="flex items-center gap-2 font-medium">
-                                  <Monitor className="h-4 w-4" />
-                                  {tb.ipAddress}
+                               <div className="font-medium text-sm flex items-center gap-2">
+                                  <Monitor className="h-4 w-4 text-primary" />
+                                  {tb.browserInfo}
                                </div>
-                               <div className="text-xs text-muted-foreground mt-1">
-                                  Last used: {new Date(tb.lastUsedAt).toLocaleDateString()}
-                               </div>
-                               <div className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                               <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
                                   <Clock className="h-3 w-3" />
                                   Expires: {new Date(tb.expiresAt).toLocaleDateString()}
                                </div>
                             </div>
-                            <Button 
-                               size="sm" 
-                               variant="outline" 
-                               className="text-destructive hover:bg-destructive/10"
-                               onClick={() => {
-                                  revokeTrustedBrowser(tb.id);
-                                  toast({ title: "Device Revoked", description: "User will be prompted for OTP on next login." });
-                               }}
-                            >
-                               Revoke
-                            </Button>
+                            {canManageUsers && (
+                               <Button variant="ghost" size="sm" onClick={() => {
+                                  revokeTrustedBrowser(tb.userId);
+                                  toast({ title: "Device Revoked", description: "The device will require OTP on next login." });
+                                  setViewingUserBrowsers(null);
+                               }} className="text-destructive hover:text-destructive hover:bg-destructive/10">
+                                  Revoke
+                               </Button>
+                            )}
                          </div>
                       ))}
                    </div>

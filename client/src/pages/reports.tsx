@@ -1,33 +1,21 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/state/auth";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { BarChart3, Coins, ShieldCheck, Download, FileText, Calendar } from "lucide-react";
-
-type ReportType = "figures" | "cashing-up" | "audit";
+import { Download, FileText, Clock, Database } from "lucide-react";
 
 export default function Reports() {
   const { toast } = useToast();
   const { session } = useAuth();
 
-  const [dateRange, setDateRange] = useState({ from: "2026-02-01", to: "2026-02-09" });
+  const [dateRange, setDateRange] = useState({ from: "2026-02-01", to: "2026-02-28" });
   const [selectedPharmacies, setSelectedPharmacies] = useState<string[]>(["all"]);
   
-  // Report Configuration State
-  const [figuresType, setFiguresType] = useState("mtd_summary");
-  const [cashingUpType, setCashingUpType] = useState("mtd_summary");
-  const [auditType, setAuditType] = useState("logins");
-
   const isHeadOffice = session.scope.type === "headoffice";
   const canExport = session.role === "Finance" || session.role === "Head Office Admin" || session.role === "Super Admin";
 
@@ -39,8 +27,7 @@ export default function Reports() {
 
   const handleDownload = (reportName: string) => {
      if (!canExport) return;
-     toast({ title: "Report Generated", description: `${reportName} has been downloaded.` });
-     // Mock download
+     toast({ title: "Export Started", description: `${reportName} is being generated and will download shortly.` });
   };
 
   const PharmacySelector = () => (
@@ -85,14 +72,13 @@ export default function Reports() {
     <AppShell>
       <div className="flex flex-col gap-6">
         <div>
-          <div className="font-serif text-2xl tracking-tight" data-testid="text-reports-title">Reports & Analytics</div>
-          <div className="text-sm text-muted-foreground" data-testid="text-reports-subtitle">
-            Generate detailed exports for Figures, Cashing Up, and Audit logs.
+          <div className="font-serif text-2xl tracking-tight">Reports & Exports</div>
+          <div className="text-sm text-muted-foreground">
+            Generate and download system data extracts and summary packs.
           </div>
         </div>
 
-        {/* SHARED CONTROLS */}
-        <Card className="p-5 rounded-2xl border bg-card/60">
+        <Card className="p-5 rounded-2xl border bg-card/60 shadow-sm">
            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               <div className="space-y-2">
                  <Label>Date Range</Label>
@@ -102,163 +88,79 @@ export default function Reports() {
                  </div>
               </div>
               <PharmacySelector />
-              <div className="flex items-end">
-                 {!canExport && (
-                    <div className="text-xs text-muted-foreground bg-secondary/50 p-2 rounded w-full">
-                       Note: Your role has view-only access. Exports are disabled.
-                    </div>
-                 )}
+              <div className="flex flex-col justify-end space-y-2">
+                 <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 p-2 rounded-lg border">
+                    <Clock className="h-3.5 w-3.5" />
+                    <span>Last Export: Today at 09:15 AM</span>
+                 </div>
+                 <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 p-2 rounded-lg border">
+                    <Database className="h-3.5 w-3.5" />
+                    <span>Last System Backup: Today at 03:00 AM</span>
+                 </div>
               </div>
            </div>
         </Card>
 
-        <div className="grid gap-6 lg:grid-cols-3">
-           
-           {/* FIGURES REPORTS */}
-           <Card className="p-5 rounded-2xl border bg-card/60 flex flex-col">
-              <div className="flex items-center gap-3 mb-4">
-                 <div className="h-10 w-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
-                    <FileText className="h-5 w-5" />
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+           <Card className="p-5 rounded-xl border hover:border-primary/20 transition-colors flex flex-col">
+              <div className="font-semibold mb-1">Module CSV Exports</div>
+              <div className="text-xs text-muted-foreground mb-4 flex-1">Raw tabular data extracts per module.</div>
+              <div className="grid grid-cols-2 gap-2">
+                 <Button variant="outline" size="sm" onClick={() => handleDownload("Daily Figures CSV")}>Figures</Button>
+                 <Button variant="outline" size="sm" onClick={() => handleDownload("Cashing Up CSV")}>Cash Up</Button>
+                 <Button variant="outline" size="sm" onClick={() => handleDownload("Bookkeeping CSV")}>Bookkeeping</Button>
+              </div>
+           </Card>
+
+           <Card className="p-5 rounded-xl border hover:border-primary/20 transition-colors flex flex-col">
+              <div className="font-semibold mb-1">Financial Exports</div>
+              <div className="text-xs text-muted-foreground mb-4 flex-1">Bonus tracking and historical service costs.</div>
+              <div className="grid grid-cols-2 gap-2">
+                 <Button variant="outline" size="sm" onClick={() => handleDownload("Bonus Export")}>Bonus CSV</Button>
+                 <Button variant="outline" size="sm" onClick={() => handleDownload("Cost History Export")}>Cost History</Button>
+              </div>
+           </Card>
+
+           <Card className="p-5 rounded-xl border hover:border-primary/20 transition-colors flex flex-col">
+              <div className="font-semibold mb-1">Compliance & Audit</div>
+              <div className="text-xs text-muted-foreground mb-4 flex-1">System activity and security logs.</div>
+              <div className="grid grid-cols-1 gap-2">
+                 <Button variant="outline" size="sm" onClick={() => handleDownload("Audit Log Export")}>
+                    <Download className="h-4 w-4 mr-2" /> Audit Log CSV
+                 </Button>
+              </div>
+           </Card>
+
+           <Card className="p-5 rounded-xl border hover:border-primary/20 transition-colors lg:col-span-3 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-primary/5">
+              <div>
+                 <div className="font-semibold flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-primary" />
+                    Monthly Pharmacy Pack
                  </div>
-                 <div>
-                    <div className="font-semibold">Figures Report</div>
-                    <div className="text-xs text-muted-foreground">Services & Item Volume</div>
+                 <div className="text-xs text-muted-foreground mt-1">
+                    A comprehensive PDF summary containing figures, financials, and completion statuses per pharmacy.
                  </div>
               </div>
-              <div className="space-y-4 flex-1">
-                 <div className="space-y-2">
-                    <Label>Report Type</Label>
-                    <Select value={figuresType} onValueChange={setFiguresType}>
-                       <SelectTrigger><SelectValue /></SelectTrigger>
-                       <SelectContent>
-                          <SelectItem value="mtd_summary">Month-to-Date Summary</SelectItem>
-                          <SelectItem value="daily_breakdown">Daily Breakdown</SelectItem>
-                          <SelectItem value="eps_paper">EPS vs Paper Split</SelectItem>
-                          <SelectItem value="paid_exempt">Paid vs Exempt Split</SelectItem>
-                          <SelectItem value="services">Services (NMS, PF, etc.)</SelectItem>
-                          <SelectItem value="comparison">Month vs Previous Month</SelectItem>
-                       </SelectContent>
-                    </Select>
-                 </div>
-                 <div className="text-xs text-muted-foreground min-h-[40px]">
-                    {figuresType === "mtd_summary" && "Summary of totals for the selected period."}
-                    {figuresType === "daily_breakdown" && "Row-by-row daily entries."}
-                    {figuresType === "services" && "Focus on clinical service performance."}
-                 </div>
-              </div>
-              <Button className="w-full mt-4" disabled={!canExport} onClick={() => handleDownload("Figures Report")}>
-                 <Download className="h-4 w-4 mr-2" /> Download CSV
+              <Button onClick={() => handleDownload("Monthly Pack PDF")} className="shrink-0">
+                 <Download className="h-4 w-4 mr-2" /> Download Monthly Pack
               </Button>
            </Card>
 
-           {/* CASHING UP REPORTS */}
-           <Card className="p-5 rounded-2xl border bg-card/60 flex flex-col">
-              <div className="flex items-center gap-3 mb-4">
-                 <div className="h-10 w-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center">
-                    <Coins className="h-5 w-5" />
+           <Card className="p-5 rounded-xl border hover:border-primary/20 transition-colors lg:col-span-3 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                 <div className="font-semibold flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-muted-foreground" />
+                    PDF Summary Exports
                  </div>
-                 <div>
-                    <div className="font-semibold">Cashing Up Report</div>
-                    <div className="text-xs text-muted-foreground">Financial Reconciliation</div>
-                 </div>
-              </div>
-              <div className="space-y-4 flex-1">
-                 <div className="space-y-2">
-                    <Label>Report Type</Label>
-                    <Select value={cashingUpType} onValueChange={setCashingUpType}>
-                       <SelectTrigger><SelectValue /></SelectTrigger>
-                       <SelectContent>
-                          <SelectItem value="mtd_summary">Month-to-Date Summary</SelectItem>
-                          <SelectItem value="daily_breakdown">Daily Breakdown</SelectItem>
-                          <SelectItem value="vat_summary">VAT Category Summary</SelectItem>
-                          <SelectItem value="payouts">Payouts Analysis</SelectItem>
-                          <SelectItem value="variance">Variance Exceptions</SelectItem>
-                          <SelectItem value="comparison">Month vs Previous Month</SelectItem>
-                       </SelectContent>
-                    </Select>
-                 </div>
-                 <div className="text-xs text-muted-foreground min-h-[40px]">
-                    {cashingUpType === "mtd_summary" && "Total takings and banking summary."}
-                    {cashingUpType === "payouts" && "Detailed list of all petty cash payouts."}
-                    {cashingUpType === "variance" && "Days with non-zero variance."}
+                 <div className="text-xs text-muted-foreground mt-1">
+                    Printable PDF summary of the selected date range.
                  </div>
               </div>
-              <Button className="w-full mt-4" disabled={!canExport} onClick={() => handleDownload("Cashing Up Report")}>
-                 <Download className="h-4 w-4 mr-2" /> Download CSV
+              <Button variant="secondary" onClick={() => handleDownload("PDF Summary")} className="shrink-0">
+                 <Download className="h-4 w-4 mr-2" /> Download PDF Summary
               </Button>
            </Card>
-
-           {/* AUDIT REPORTS */}
-           <Card className="p-5 rounded-2xl border bg-card/60 flex flex-col">
-              <div className="flex items-center gap-3 mb-4">
-                 <div className="h-10 w-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center">
-                    <ShieldCheck className="h-5 w-5" />
-                 </div>
-                 <div>
-                    <div className="font-semibold">Audit Report</div>
-                    <div className="text-xs text-muted-foreground">Security & Compliance</div>
-                 </div>
-              </div>
-              <div className="space-y-4 flex-1">
-                 <div className="space-y-2">
-                    <Label>Report Type</Label>
-                    <Select value={auditType} onValueChange={setAuditType}>
-                       <SelectTrigger><SelectValue /></SelectTrigger>
-                       <SelectContent>
-                          <SelectItem value="logins">Logins & Access</SelectItem>
-                          <SelectItem value="edits">Edits Only</SelectItem>
-                          <SelectItem value="deletions">Deletions Only</SelectItem>
-                          <SelectItem value="problems">Problem Tickets</SelectItem>
-                          <SelectItem value="full_dump">Full System Dump</SelectItem>
-                       </SelectContent>
-                    </Select>
-                 </div>
-                 <div className="text-xs text-muted-foreground min-h-[40px]">
-                    {auditType === "logins" && "User sessions and failed attempts."}
-                    {auditType === "edits" && "Changes to historical records."}
-                    {auditType === "deletions" && "User or branch deletion events."}
-                 </div>
-              </div>
-              <Button className="w-full mt-4" disabled={!canExport} onClick={() => handleDownload("Audit Report")}>
-                 <Download className="h-4 w-4 mr-2" /> Download CSV
-              </Button>
-           </Card>
-
         </div>
-
-        {/* PREVIEW TABLE */}
-        <Card className="p-5 rounded-2xl border bg-card/60">
-           <div className="text-sm font-semibold mb-4">Recent Generated Reports</div>
-           <div className="overflow-hidden rounded-xl border bg-background/40">
-              <Table>
-                 <TableHeader>
-                    <TableRow>
-                       <TableHead>Report Name</TableHead>
-                       <TableHead>Generated By</TableHead>
-                       <TableHead>Date</TableHead>
-                       <TableHead>Scope</TableHead>
-                       <TableHead className="text-right">Action</TableHead>
-                    </TableRow>
-                 </TableHeader>
-                 <TableBody>
-                    <TableRow>
-                       <TableCell>Figures Report (Jan 2026)</TableCell>
-                       <TableCell>Finance Team</TableCell>
-                       <TableCell>2026-02-01 09:00</TableCell>
-                       <TableCell>All Pharmacies</TableCell>
-                       <TableCell className="text-right"><Button size="sm" variant="ghost">Re-download</Button></TableCell>
-                    </TableRow>
-                    <TableRow>
-                       <TableCell>Cashing Up Variance</TableCell>
-                       <TableCell>Ahmed</TableCell>
-                       <TableCell>2026-02-05 14:20</TableCell>
-                       <TableCell>Bowland Pharmacy</TableCell>
-                       <TableCell className="text-right"><Button size="sm" variant="ghost">Re-download</Button></TableCell>
-                    </TableRow>
-                 </TableBody>
-              </Table>
-           </div>
-        </Card>
       </div>
     </AppShell>
   );

@@ -13,6 +13,7 @@ import {
   BookOpen,
   Award,
   Shield,
+  AlertTriangle,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -46,6 +47,13 @@ export function AppShell({ children }: PropsWithChildren) {
          label: "Bookkeeping", 
          icon: BookOpen, 
          testId: "link-nav-bookkeeping" 
+      },
+      {
+        href: "/exceptions",
+        label: "Exceptions",
+        icon: AlertTriangle,
+        testId: "link-nav-exceptions",
+        requiresRole: (r) => r === "Head Office Admin" || r === "Super Admin",
       },
       {
         href: "/reports",

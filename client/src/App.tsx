@@ -14,6 +14,7 @@ import Bookkeeping from "./pages/bookkeeping";
 import Reports from "./pages/reports";
 import Documents from "./pages/documents";
 import Admin from "./pages/admin";
+import Exceptions from "./pages/exceptions";
 import BonusPerformance from "./pages/bonus-performance";
 import AccessOverview from "./pages/access-overview";
 import { AuthProvider, useAuth } from "@/state/auth";
@@ -45,6 +46,7 @@ function Router() {
       <GuardedRoute path="/reports" component={Reports} />
       <GuardedRoute path="/documents" component={Documents} />
       <GuardedRoute path="/admin" component={Admin} />
+      <GuardedRoute path="/exceptions" component={Exceptions} />
       <GuardedRoute path="/bonus-performance" component={BonusPerformance} />
       <GuardedRoute path="/access-overview" component={AccessOverview} />
 
