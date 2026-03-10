@@ -2,21 +2,42 @@ import { useState, useMemo, useEffect } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { format } from "date-fns";
-import { CheckCircle2, ChevronRight, FileCheck, Edit, Plus, Trash2, Lock, Unlock } from "lucide-react";
+import { CheckCircle2, ChevronRight, FileCheck, Lock, Unlock, X, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/state/auth";
 import { useToast } from "@/hooks/use-toast";
-import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 
-// Full Template from Checklist
+// Reordered template with MYS & In House first
 const FULL_TEMPLATE = [
+  // MYS & In House
+  { id: "mounjaro_csv", label: "Mounjaro CSV", group: "MYS & In House", required: true },
+  { id: "safety_report", label: "Safety Report", group: "MYS & In House", required: true },
+  { id: "national_safety_alert", label: "National Safety Alert", group: "MYS & In House", required: true },
+  { id: "meeting_notes", label: "Meeting Notes", group: "MYS & In House", required: true },
+  { id: "signposting_form", label: "Signposting Form", group: "MYS & In House", required: true },
+  { id: "figures_submission", label: "Figures Submission", group: "MYS & In House", required: true },
+  { id: "nms", label: "NMS", group: "MYS & In House", required: true },
+  { id: "ssp", label: "SSP", group: "MYS & In House", required: true },
+  { id: "dms", label: "DMS", group: "MYS & In House", required: true },
+  { id: "pharmacy_first", label: "Pharmacy First", group: "MYS & In House", required: true },
+  { id: "contraceptive", label: "Contraceptive", group: "MYS & In House", required: true },
+  { id: "unpaid_items", label: "Unpaid Items", group: "MYS & In House", required: true },
+  { id: "covid", label: "COVID", group: "MYS & In House", required: true },
+  { id: "flu", label: "Flu", group: "MYS & In House", required: true },
+  { id: "child_flu", label: "Child Flu", group: "MYS & In House", required: true },
+  { id: "hypertension_case_finding", label: "Hypertension Case Finding", group: "MYS & In House", required: true },
+  { id: "local_services_figures", label: "Local services on Figures", group: "MYS & In House", required: true },
+  { id: "empty_stock_drawers", label: "Empty the Stock Drawers", group: "MYS & In House", required: true },
+  { id: "end_of_month_posted", label: "End of Month Posted?", group: "MYS & In House", required: true },
+  { id: "check_reclaimable", label: "Check RECLAIMABLE", group: "MYS & In House", required: true },
+  { id: "reconcile_credit_notes", label: "Reconcile credit notes", group: "MYS & In House", required: true },
+  { id: "scriptlife_audit", label: "SCRIPTLIFE AUDIT AND - Remove Scripts", group: "MYS & In House", required: true },
+  { id: "check_spine_claim", label: "Check Spine and Claim", group: "MYS & In House", required: true },
+
   // Main Wholesalers
   { id: "aah305", label: "AAH305", group: "Main Wholesalers" },
   { id: "aah606", label: "AAH606", group: "Main Wholesalers" },
@@ -64,31 +85,6 @@ const FULL_TEMPLATE = [
   { id: "verisure", label: "Verisure", group: "Others" },
   { id: "worldpay", label: "Worldpay", group: "Others" },
   { id: "xero", label: "Xero", group: "Others" },
-
-  // MYS & In House
-  { id: "mounjaro_csv", label: "Mounjaro CSV", group: "MYS & In House" },
-  { id: "safety_report", label: "Safety Report", group: "MYS & In House" },
-  { id: "national_safety_alert", label: "National Safety Alert", group: "MYS & In House" },
-  { id: "meeting_notes", label: "Meeting Notes", group: "MYS & In House" },
-  { id: "signposting_form", label: "Signposting Form", group: "MYS & In House" },
-  { id: "figures_submission", label: "Figures Submission", group: "MYS & In House" },
-  { id: "nms", label: "NMS", group: "MYS & In House" },
-  { id: "ssp", label: "SSP", group: "MYS & In House" },
-  { id: "dms", label: "DMS", group: "MYS & In House" },
-  { id: "pharmacy_first", label: "Pharmacy First", group: "MYS & In House" },
-  { id: "contraceptive", label: "Contraceptive", group: "MYS & In House" },
-  { id: "unpaid_items", label: "Unpaid Items", group: "MYS & In House" },
-  { id: "covid", label: "COVID", group: "MYS & In House" },
-  { id: "flu", label: "Flu", group: "MYS & In House" },
-  { id: "child_flu", label: "Child Flu", group: "MYS & In House" },
-  { id: "hypertension_case_finding", label: "Hypertension Case Finding", group: "MYS & In House" },
-  { id: "local_services_figures", label: "Local services on Figures", group: "MYS & In House" },
-  { id: "empty_stock_drawers", label: "Empty the Stock Drawers", group: "MYS & In House" },
-  { id: "end_of_month_posted", label: "End of Month Posted?", group: "MYS & In House" },
-  { id: "check_reclaimable", label: "Check RECLAIMABLE", group: "MYS & In House" },
-  { id: "reconcile_credit_notes", label: "Reconcile credit notes", group: "MYS & In House" },
-  { id: "scriptlife_audit", label: "SCRIPTLIFE AUDIT AND - Remove Scripts", group: "MYS & In House" },
-  { id: "check_spine_claim", label: "Check Spine and Claim", group: "MYS & In House" },
 ];
 
 const MONTHS = [
@@ -96,99 +92,121 @@ const MONTHS = [
   "July", "August", "September", "October", "November", "December"
 ];
 
+// ItemState: 'completed' (ticked), 'not_used' (crossed), 'pending' (blank)
+type ItemState = 'completed' | 'not_used' | 'pending';
+
 type ChecklistEntry = {
   itemId: string;
-  completed: boolean;
+  state: ItemState;
   completedBy?: string;
   completedAt?: number;
-  note?: string;
+  saved: boolean; // Indicates if this entry has been committed/saved
 };
 
 type TemplateItem = {
   id: string;
   label: string;
   group: string;
+  required?: boolean;
 };
 
 export default function Bookkeeping() {
   const { session } = useAuth();
   const { toast } = useToast();
   
-  const [year, setYear] = useState<string>(new Date().getFullYear().toString());
-  const [selectedMonth, setSelectedMonth] = useState<string>(MONTHS[new Date().getMonth()]);
+  const currentYear = new Date().getFullYear().toString();
+  const currentMonth = MONTHS[new Date().getMonth()];
   
-  // Mock Template State (In-memory) - Head Office can edit this
-  const [template, setTemplate] = useState<TemplateItem[]>(FULL_TEMPLATE);
+  const [year, setYear] = useState<string>(currentYear);
+  const [selectedMonth, setSelectedMonth] = useState<string>(currentMonth);
+  
   const [checklistData, setChecklistData] = useState<Record<string, ChecklistEntry>>({});
   const [lockedMonths, setLockedMonths] = useState<string[]>([]);
+  
+  const [saveWarningOpen, setSaveWarningOpen] = useState(false);
 
-  // Template Editor State
-  const [editMode, setEditMode] = useState(false);
-  const [newItemLabel, setNewItemLabel] = useState("");
-  const [newItemGroup, setNewItemGroup] = useState("General");
-
-  // Load from local storage on mount (simulation)
+  // Load from local storage
   useEffect(() => {
-     const savedData = localStorage.getItem('bookkeeping_data');
+     const savedData = localStorage.getItem('bookkeeping_data_v2');
      if (savedData) setChecklistData(JSON.parse(savedData));
      
-     const savedLocks = localStorage.getItem('bookkeeping_locks');
+     const savedLocks = localStorage.getItem('bookkeeping_locks_v2');
      if (savedLocks) setLockedMonths(JSON.parse(savedLocks));
   }, []);
 
   const saveToStorage = (data: any, locks: any) => {
-     localStorage.setItem('bookkeeping_data', JSON.stringify(data));
-     localStorage.setItem('bookkeeping_locks', JSON.stringify(locks));
+     localStorage.setItem('bookkeeping_data_v2', JSON.stringify(data));
+     localStorage.setItem('bookkeeping_locks_v2', JSON.stringify(locks));
   };
 
   const isHeadOffice = session.scope.type === "headoffice";
   const monthKey = `${year}-${selectedMonth}`;
   const isLocked = lockedMonths.includes(monthKey);
+  const isHistoric = (year < currentYear) || (year === currentYear && MONTHS.indexOf(selectedMonth) < MONTHS.indexOf(currentMonth));
+  
+  // Can interact if:
+  // Head Office -> Always yes
+  // Pharmacy -> Yes if month is not locked AND it's the current month (or they are catching up and it's not locked)
+  const canInteractMonth = isHeadOffice || !isLocked;
 
-  const toggleItem = (itemId: string) => {
-    if (editMode || isLocked) return;
-    const key = `${monthKey}-${itemId}`;
+  const handleStateCycle = (itemId: string, itemRequired: boolean) => {
+    if (!canInteractMonth) return;
     
-    setChecklistData(prev => {
-      const current = prev[key];
-      let next;
-      if (current?.completed) {
-        next = { ...prev };
-        delete next[key];
-      } else {
-        next = {
-          ...prev,
-          [key]: {
-            itemId,
-            completed: true,
-            completedBy: session.staff?.name || "Unknown Staff",
-            completedAt: Date.now(),
-            note: ""
-          }
-        };
-      }
-      saveToStorage(next, lockedMonths);
-      return next;
-    });
-  };
-
-  const updateNote = (itemId: string, note: string) => {
-    if (editMode || isLocked) return;
     const key = `${monthKey}-${itemId}`;
+    const entry = checklistData[key] || { itemId, state: 'pending', saved: false };
+    
+    // If it's saved and we're not Head Office, we can't change it
+    if (entry.saved && !isHeadOffice) return;
+
     setChecklistData(prev => {
+      let nextState: ItemState = 'pending';
+      
+      // Cycle: pending -> completed -> not_used -> pending
+      // If required, cycle: pending -> completed -> pending (skip not_used)
+      if (entry.state === 'pending') {
+         nextState = 'completed';
+      } else if (entry.state === 'completed') {
+         nextState = itemRequired ? 'pending' : 'not_used';
+      } else if (entry.state === 'not_used') {
+         nextState = 'pending';
+      }
+      
       const next = {
         ...prev,
         [key]: {
-          ...(prev[key] || { itemId, completed: false, completedBy: session.staff?.name }),
-          note
+          itemId,
+          state: nextState,
+          completedBy: nextState !== 'pending' ? session.staff?.name || session.userEmail : undefined,
+          completedAt: nextState !== 'pending' ? Date.now() : undefined,
+          saved: entry.saved // Preserve saved status
         }
       };
-      saveToStorage(next, lockedMonths);
+      
+      // We don't save to storage here, just state
       return next;
     });
   };
 
-  const handleLock = () => {
+  const handleSaveItems = () => {
+     // Check if all required items are marked as completed before allowing lock
+     // Actually, saving just commits current ticks. Locking requires all mandatory.
+     
+     setChecklistData(prev => {
+        const next = { ...prev };
+        Object.keys(next).forEach(k => {
+           if (k.startsWith(`${monthKey}-`) && next[k].state !== 'pending') {
+              next[k].saved = true;
+           }
+        });
+        saveToStorage(next, lockedMonths);
+        return next;
+     });
+     
+     setSaveWarningOpen(false);
+     toast({ title: "Progress Saved", description: "Marked items have been saved and locked for this month." });
+  };
+
+  const handleLockMonth = () => {
      if (isLocked) {
         // Unlock (Head Office Only)
         if (!isHeadOffice) return;
@@ -197,6 +215,18 @@ export default function Bookkeeping() {
         saveToStorage(checklistData, next);
         toast({ title: "Month Unlocked", description: "Edits can now be made." });
      } else {
+        // Enforce all mandatory items are 'completed'
+        const mandatoryItems = FULL_TEMPLATE.filter(i => i.required);
+        const missing = mandatoryItems.some(i => {
+           const entry = checklistData[`${monthKey}-${i.id}`];
+           return !entry || entry.state !== 'completed';
+        });
+        
+        if (missing) {
+           toast({ title: "Cannot Lock Month", description: "All MYS & In House items must be completed before locking the month.", variant: "destructive" });
+           return;
+        }
+
         // Lock
         const next = [...lockedMonths, monthKey];
         setLockedMonths(next);
@@ -205,48 +235,37 @@ export default function Bookkeeping() {
      }
   };
 
-  // Add Item to Template
-  const addTemplateItem = () => {
-     if (!newItemLabel) return;
-     setTemplate(prev => [...prev, {
-        id: `custom_${Date.now()}`,
-        label: newItemLabel,
-        group: newItemGroup
-     }]);
-     setNewItemLabel("");
-     toast({ title: "Item Added", description: "Template updated for all branches." });
-  };
-
-  // Remove Item from Template
-  const removeTemplateItem = (id: string) => {
-     setTemplate(prev => prev.filter(i => i.id !== id));
-  };
-
   const groupedItems = useMemo(() => {
     const groups: Record<string, TemplateItem[]> = {};
-    // Ensure groups appear in correct order
-    const orderedGroups = ["Main Wholesalers", "Sales", "Others", "MYS & In House", "General"];
-    
-    // Initialize
+    const orderedGroups = ["MYS & In House", "Main Wholesalers", "Sales", "Others"];
     orderedGroups.forEach(g => groups[g] = []);
-    
-    template.forEach(item => {
-      groups[item.group] ||= [];
-      groups[item.group].push(item);
-    });
-    
-    // Clean up empty
-    Object.keys(groups).forEach(key => {
-       if (groups[key].length === 0) delete groups[key];
-    });
-
+    FULL_TEMPLATE.forEach(item => groups[item.group].push(item));
     return groups;
-  }, [template]);
+  }, []);
 
-  const progress = useMemo(() => {
-    const completedCount = template.filter(i => checklistData[`${monthKey}-${i.id}`]?.completed).length;
-    return Math.round((completedCount / template.length) * 100);
-  }, [checklistData, monthKey, template]);
+  const progressCalc = useMemo(() => {
+    const total = FULL_TEMPLATE.length;
+    const completed = FULL_TEMPLATE.filter(i => {
+       const state = checklistData[`${monthKey}-${i.id}`]?.state;
+       return state === 'completed' || state === 'not_used';
+    }).length;
+    
+    // Also calc section progress
+    const sectionProgress: Record<string, number> = {};
+    Object.entries(groupedItems).forEach(([group, items]) => {
+       const sectionTotal = items.length;
+       const sectionCompleted = items.filter(i => {
+          const state = checklistData[`${monthKey}-${i.id}`]?.state;
+          return state === 'completed' || state === 'not_used';
+       }).length;
+       sectionProgress[group] = Math.round((sectionCompleted / sectionTotal) * 100);
+    });
+
+    return {
+       overall: Math.round((completed / total) * 100),
+       sections: sectionProgress
+    };
+  }, [checklistData, monthKey, groupedItems]);
 
   return (
     <AppShell>
@@ -255,28 +274,17 @@ export default function Bookkeeping() {
           <div>
             <div className="font-serif text-2xl tracking-tight">Bookkeeping Checklist</div>
             <div className="text-sm text-muted-foreground">
-              Monthly compliance and task tracking.
+              Monthly compliance tracking. Click to toggle state.
             </div>
-          </div>
-          
-          <div className="flex gap-2">
-             {isHeadOffice && (
-               <Button variant={editMode ? "secondary" : "outline"} onClick={() => setEditMode(!editMode)}>
-                  <Edit className="h-4 w-4 mr-2" />
-                  {editMode ? "Done Editing" : "Edit Template"}
-               </Button>
-             )}
           </div>
         </div>
 
         <div className="grid lg:grid-cols-[250px_1fr] gap-6 h-full overflow-hidden">
-          {/* Sidebar / Navigation */}
-          <Card className="rounded-2xl border bg-card/60 flex flex-col h-full overflow-hidden">
+          {/* Sidebar */}
+          <Card className="rounded-2xl border bg-card/60 flex flex-col h-full overflow-hidden shadow-sm">
              <div className="p-4 border-b">
                 <Select value={year} onValueChange={setYear}>
-                   <SelectTrigger>
-                      <SelectValue />
-                   </SelectTrigger>
+                   <SelectTrigger><SelectValue /></SelectTrigger>
                    <SelectContent>
                       <SelectItem value="2026">2026</SelectItem>
                       <SelectItem value="2025">2025</SelectItem>
@@ -285,153 +293,119 @@ export default function Bookkeeping() {
              </div>
              <ScrollArea className="flex-1">
                 <div className="p-2 grid gap-1">
-                   {MONTHS.map(month => (
-                      <Button
-                         key={month}
-                         variant={selectedMonth === month ? "secondary" : "ghost"}
-                         className={`justify-between w-full font-normal ${selectedMonth === month ? "bg-primary/10 text-primary hover:bg-primary/15" : ""}`}
-                         onClick={() => setSelectedMonth(month)}
-                      >
-                         {month}
-                         {selectedMonth === month && <ChevronRight className="h-4 w-4 opacity-50" />}
-                      </Button>
-                   ))}
+                   {MONTHS.map(month => {
+                      const isCurrent = month === currentMonth && year === currentYear;
+                      return (
+                         <Button
+                            key={month}
+                            variant={selectedMonth === month ? "secondary" : "ghost"}
+                            className={`justify-between w-full font-normal ${selectedMonth === month ? "bg-primary/10 text-primary hover:bg-primary/15" : ""} ${isCurrent ? "font-semibold" : ""}`}
+                            onClick={() => setSelectedMonth(month)}
+                         >
+                            {month} {isCurrent && <span className="text-[10px] ml-1 opacity-50">(Current)</span>}
+                            {selectedMonth === month && <ChevronRight className="h-4 w-4 opacity-50" />}
+                         </Button>
+                      )
+                   })}
                 </div>
              </ScrollArea>
           </Card>
 
-          {/* Checklist Content */}
-          <Card className="rounded-2xl border bg-card/60 flex flex-col h-full overflow-hidden">
-             <div className="flex items-center justify-between p-6 border-b shrink-0">
-                <div className="flex items-center gap-3">
-                   <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                      {isLocked ? <Lock className="h-5 w-5" /> : <FileCheck className="h-5 w-5" />}
+          {/* Main List */}
+          <Card className="rounded-2xl border bg-card/60 flex flex-col h-full overflow-hidden shadow-sm">
+             <div className="flex items-center justify-between p-6 border-b shrink-0 bg-background/50">
+                <div className="flex items-center gap-4">
+                   <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                      {isLocked ? <Lock className="h-6 w-6" /> : <FileCheck className="h-6 w-6" />}
                    </div>
                    <div>
                       <div className="font-semibold text-lg flex items-center gap-2">
                          {selectedMonth} {year}
-                         {isLocked && <Badge variant="secondary" className="bg-amber-100 text-amber-700 hover:bg-amber-100">LOCKED</Badge>}
+                         {isLocked && <Badge variant="secondary" className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-amber-200">LOCKED</Badge>}
+                         {!isLocked && isHistoric && <Badge variant="outline" className="text-muted-foreground">Historical</Badge>}
                       </div>
-                      <div className="text-xs text-muted-foreground flex items-center gap-2">
-                         <div className="h-1.5 w-24 bg-muted rounded-full overflow-hidden">
-                            <div className="h-full bg-primary transition-all duration-500" style={{ width: `${progress}%` }} />
+                      <div className="text-xs text-muted-foreground flex items-center gap-3 mt-1">
+                         <div className="h-2 w-32 bg-muted rounded-full overflow-hidden">
+                            <div className="h-full bg-primary transition-all duration-500" style={{ width: `${progressCalc.overall}%` }} />
                          </div>
-                         <span className="font-medium">{progress}%</span>
+                         <span className="font-medium">{progressCalc.overall}% Complete</span>
                       </div>
                    </div>
                 </div>
                 
-                <div className="flex items-center gap-2">
-                   {!editMode && (
+                <div className="flex items-center gap-3">
+                   {/* Actions */}
+                   {!isLocked && canInteractMonth && (
+                      <Dialog open={saveWarningOpen} onOpenChange={setSaveWarningOpen}>
+                         <DialogTrigger asChild>
+                            <Button variant="secondary" className="border-primary/20 hover:bg-primary/5">
+                               Save Progress
+                            </Button>
+                         </DialogTrigger>
+                         <DialogContent>
+                            <DialogHeader>
+                               <DialogTitle>Double check all your entries</DialogTitle>
+                               <DialogDescription>
+                                  Saving will commit the currently ticked and marked items. For pharmacy users, saved items cannot be edited later.
+                               </DialogDescription>
+                            </DialogHeader>
+                            <DialogFooter>
+                               <Button variant="outline" onClick={() => setSaveWarningOpen(false)}>Cancel</Button>
+                               <Button onClick={handleSaveItems}>Confirm Save</Button>
+                            </DialogFooter>
+                         </DialogContent>
+                      </Dialog>
+                   )}
+
+                   {(isHeadOffice || canInteractMonth) && (
                       <Button 
                          variant={isLocked ? "outline" : "default"} 
-                         onClick={handleLock}
+                         onClick={handleLockMonth}
                          disabled={isLocked && !isHeadOffice}
                          className={isLocked ? "border-amber-500/50 text-amber-600 hover:bg-amber-50" : ""}
                       >
-                         {isLocked ? <><Unlock className="h-4 w-4 mr-2" /> Unlock Month</> : <><Lock className="h-4 w-4 mr-2" /> Save & Lock</>}
+                         {isLocked ? <><Unlock className="h-4 w-4 mr-2" /> Unlock Month</> : <><Lock className="h-4 w-4 mr-2" /> Lock Month</>}
                       </Button>
-                   )}
-
-                   {editMode && (
-                      <Dialog>
-                         <DialogTrigger asChild>
-                            <Button size="sm"><Plus className="h-4 w-4 mr-2" /> Add Item</Button>
-                         </DialogTrigger>
-                         <DialogContent>
-                            <DialogHeader><DialogTitle>Add Template Item</DialogTitle></DialogHeader>
-                            <div className="grid gap-4 py-4">
-                               <div className="grid gap-2">
-                                  <Label>Item Name</Label>
-                                  <Input value={newItemLabel} onChange={e => setNewItemLabel(e.target.value)} />
-                               </div>
-                               <div className="grid gap-2">
-                                  <Label>Group</Label>
-                                  <Select value={newItemGroup} onValueChange={setNewItemGroup}>
-                                     <SelectTrigger><SelectValue /></SelectTrigger>
-                                     <SelectContent>
-                                        <SelectItem value="Main Wholesalers">Main Wholesalers</SelectItem>
-                                        <SelectItem value="Sales">Sales</SelectItem>
-                                        <SelectItem value="Others">Others</SelectItem>
-                                        <SelectItem value="MYS & In House">MYS & In House</SelectItem>
-                                        <SelectItem value="General">General</SelectItem>
-                                     </SelectContent>
-                                  </Select>
-                               </div>
-                            </div>
-                            <DialogFooter><Button onClick={addTemplateItem}>Add</Button></DialogFooter>
-                         </DialogContent>
-                      </Dialog>
                    )}
                 </div>
              </div>
              
              <ScrollArea className="flex-1">
-                <div className="p-6 space-y-8">
+                <div className="p-6 space-y-6">
                    {Object.entries(groupedItems).map(([group, items]) => (
-                      <div key={group} className="space-y-3">
-                         <div className="text-sm font-semibold text-muted-foreground uppercase tracking-wider border-b pb-2 sticky top-0 bg-card/95 backdrop-blur z-10">
-                            {group}
+                      <div key={group} className="space-y-2">
+                         <div className="flex items-center justify-between border-b pb-2 mb-3 sticky top-0 bg-card/95 backdrop-blur z-10">
+                            <div className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                               {group}
+                            </div>
+                            <div className="text-xs font-medium text-muted-foreground">
+                               {progressCalc.sections[group]}%
+                            </div>
                          </div>
-                         <div className="grid gap-3 lg:grid-cols-2">
+                         
+                         <div className="grid gap-x-6 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
                             {items.map(item => {
                                const key = `${monthKey}-${item.id}`;
-                               const entry = checklistData[key];
-                               const isChecked = !!entry?.completed;
+                               const entry = checklistData[key] || { state: 'pending', saved: false };
+                               const isSaved = entry.saved && !isHeadOffice;
+                               const isReadOnly = isLocked || isSaved;
 
                                return (
-                                  <div 
-                                     key={item.id} 
-                                     className={`group rounded-xl border p-3 transition-all ${isChecked ? "bg-primary/5 border-primary/20" : "bg-background/40 hover:border-primary/20"}`}
-                                  >
-                                     <div className="flex items-start gap-3">
-                                        {!editMode && (
-                                           <Checkbox 
-                                              id={item.id} 
-                                              checked={isChecked}
-                                              disabled={isLocked}
-                                              onCheckedChange={() => toggleItem(item.id)}
-                                              className="mt-1"
-                                           />
-                                        )}
-                                        
-                                        <div className="flex-1 space-y-1.5 min-w-0">
-                                           <div className="flex items-start justify-between">
-                                              <Label 
-                                                 htmlFor={item.id} 
-                                                 className={`text-sm font-medium leading-tight break-words ${isLocked ? "" : "cursor-pointer"}`}
-                                              >
-                                                 {item.label}
-                                              </Label>
-                                              
-                                              <div className="flex items-center gap-2 shrink-0">
-                                                 {isChecked && !editMode && (
-                                                    <Badge variant="secondary" className="text-[10px] h-5 px-1.5 bg-background/50 whitespace-nowrap">
-                                                       <CheckCircle2 className="h-3 w-3 mr-1 text-emerald-500" />
-                                                       {entry.completedBy}
-                                                    </Badge>
-                                                 )}
-                                                 
-                                                 {editMode && (
-                                                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-destructive" onClick={() => removeTemplateItem(item.id)}>
-                                                       <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                 )}
-                                              </div>
-                                           </div>
-                                           
-                                           {!editMode && (
-                                              <div className="relative">
-                                                 <Input 
-                                                    placeholder="Add optional note..." 
-                                                    className="h-8 text-xs bg-transparent border-transparent hover:border-input focus:border-input focus:bg-background transition-all px-2"
-                                                    value={entry?.note || ""}
-                                                    disabled={isLocked}
-                                                    onChange={e => updateNote(item.id, e.target.value)}
-                                                 />
-                                              </div>
-                                           )}
-                                        </div>
+                                  <div key={item.id} className={`flex items-center py-1.5 px-2 rounded-lg transition-colors hover:bg-muted/50 ${entry.state !== 'pending' ? 'bg-muted/30' : ''}`}>
+                                     <button
+                                        type="button"
+                                        disabled={isReadOnly}
+                                        onClick={() => handleStateCycle(item.id, !!item.required)}
+                                        className={`flex items-center justify-center w-5 h-5 rounded border mr-3 shrink-0 transition-all ${isReadOnly ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${entry.state === 'completed' ? 'bg-emerald-500 border-emerald-500 text-white' : entry.state === 'not_used' ? 'bg-muted-foreground/20 border-muted-foreground text-muted-foreground' : 'border-input hover:border-primary'}`}
+                                     >
+                                        {entry.state === 'completed' && <CheckCircle2 className="h-3.5 w-3.5" />}
+                                        {entry.state === 'not_used' && <X className="h-3.5 w-3.5" />}
+                                     </button>
+                                     <div className="flex-1 min-w-0 flex items-center justify-between">
+                                        <span className={`text-sm truncate ${entry.state !== 'pending' ? 'text-muted-foreground' : 'font-medium'}`}>
+                                           {item.label}
+                                        </span>
+                                        {item.required && <span className="text-[10px] text-destructive ml-2 shrink-0">*</span>}
                                      </div>
                                   </div>
                                );
@@ -441,6 +415,13 @@ export default function Bookkeeping() {
                    ))}
                 </div>
              </ScrollArea>
+             
+             <div className="p-3 bg-muted/30 border-t flex items-center justify-center gap-6 text-xs text-muted-foreground shrink-0">
+                <div className="flex items-center gap-1.5"><div className="w-4 h-4 rounded bg-emerald-500 flex items-center justify-center"><CheckCircle2 className="w-3 h-3 text-white"/></div> = Received/Complete</div>
+                <div className="flex items-center gap-1.5"><div className="w-4 h-4 rounded bg-muted-foreground/20 border border-muted-foreground flex items-center justify-center"><X className="w-3 h-3 text-muted-foreground"/></div> = Not used this month</div>
+                <div className="flex items-center gap-1.5"><div className="w-4 h-4 rounded border border-input"></div> = Not done</div>
+                <div className="flex items-center gap-1.5 text-destructive ml-4">* = Mandatory</div>
+             </div>
           </Card>
         </div>
       </div>
