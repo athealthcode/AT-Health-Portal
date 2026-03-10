@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { AlertCircle, Calendar, CheckCircle2, ArrowLeft, ArrowRight, Lock, Edit2, FileCheck, Landmark } from "lucide-react";
+import { AlertCircle, Calendar, CheckCircle2, ArrowLeft, ArrowRight, Lock, Edit2, FileCheck, Landmark, CalendarIcon } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { format } from "date-fns";
