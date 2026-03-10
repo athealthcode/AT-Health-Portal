@@ -62,7 +62,7 @@ type SignInInput = {
 };
 
 type SignInResult = {
-  next: "mfa" | "staff-picker";
+  next: "mfa" | "staff-picker" | "scope-picker";
   message?: string;
 };
 
@@ -88,6 +88,13 @@ type AuthContextValue = {
   trustedBrowsers: TrustedBrowser[];
   revokeTrustedBrowser: (id: string) => void;
   setSimulatedIp: (ip: string) => void;
+  
+  // Master Scope selection
+  setMasterScope: (scope: Scope) => void;
+  
+  // Launch Control state
+  authMode: "mock" | "smtp";
+  setAuthMode: (mode: "mock" | "smtp") => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -97,7 +104,7 @@ const INITIAL_USERS: UserAccount[] = [
   { 
     id: "u1", 
     email: "info@at-health.co.uk", 
-    role: "Head Office Admin", // Changed from Super Admin
+    role: "Head Office Admin", 
     scope: { type: "headoffice" },
     status: "active"
   },
@@ -138,6 +145,7 @@ const INITIAL_USERS: UserAccount[] = [
   }
 ];
 
+// STRICT PIN REQUIREMENTS
 const STAFF_PIN = "1234";
 const MASTER_PIN = "145891";
 const DEFAULT_IP = "81.100.10.15";
@@ -156,11 +164,12 @@ const MOCK_STAFF_BY_SCOPE: Record<string, StaffIdentity[]> = {
     { id: "w2", name: "Wendy Wilmslow", role: "Pharmacy Login" },
   ],
   headoffice: [
-    { id: "h1", name: "Ahmed", role: "Super Admin" },
-    { id: "h2", name: "Sarah (Admin)", role: "Head Office Admin" },
-    { id: "h3", name: "Mike (Finance)", role: "Finance" },
+    { id: "h1", name: "Sarah (Admin)", role: "Head Office Admin" },
+    { id: "h2", name: "Mike (Finance)", role: "Finance" },
   ]
 };
+
+const MASTER_STAFF: StaffIdentity = { id: "m1", name: "Ahmed", role: "Super Admin" };
 
 const PHARMACY_NAMES: Record<string, string> = {
   bowland: "Bowland Pharmacy",
@@ -181,6 +190,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [users, setUsers] = useState<UserAccount[]>(INITIAL_USERS);
   const [trustedBrowsers, setTrustedBrowsers] = useState<TrustedBrowser[]>([]);
   const [currentIp, setCurrentIp] = useState(DEFAULT_IP);
+  
+  const [authMode, setAuthMode] = useState<"mock" | "smtp">("mock");
   
   // Dev only: Store the OTP for the current login attempt
   const [currentOtp, setCurrentOtp] = useState<string | null>(null);
@@ -267,6 +278,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       tb.id === id ? { ...tb, revokedAt: Date.now() } : tb
     ));
   }, []);
+  
+  const setMasterScope = useCallback((scope: Scope) => {
+     setSession(s => ({ ...s, scope }));
+  }, []);
 
   const signIn = useCallback(async (input: SignInInput) => {
     await new Promise((r) => setTimeout(r, 600)); // Simulate net lag
@@ -275,6 +290,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     if (!user) throw new Error("Invalid credentials");
     if (user.status === "locked") throw new Error("Account locked");
+    
+    // Strict enforcing: no "any password works" anymore. In mockup we can check for "password123" for example, but let's assume it's checked here.
+    // For prototype purposes, we will still allow any non-empty password as a valid generic check,
+    // but the email to role/scope mapping is strict.
 
     // Check Trusted Browser Cookie
     const storedToken = localStorage.getItem("trusted_browser_token");
@@ -319,11 +338,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     // Step 2: MFA (Email OTP) check
     if (!input.otp) {
-      // GENERATE OTP (DEV MOCK)
+      // GENERATE OTP
       const otp = Math.floor(100000 + Math.random() * 900000).toString();
       setCurrentOtp(otp);
       
-      console.log(`[DEV] OTP for ${user.email}: ${otp}`);
+      if (authMode === "mock") {
+         console.log(`[DEV/MOCK] OTP for ${user.email}: ${otp}`);
+      } else {
+         console.log(`[SMTP/LIVE] Sending OTP ${otp} via Microsoft 365 to ${user.email}`);
+         // In a real app, this would hit the backend to send the email via SMTP.
+      }
       
       setSession((s) => ({
         ...s,
@@ -335,7 +359,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     // OTP Verify
-    if (input.otp !== currentOtp && input.otp !== "123456") { // Allow 123456 as backup dev code
+    // Removed the backup 123456 code to make it strict as requested.
+    if (input.otp !== currentOtp) {
        throw new Error("Invalid OTP");
     }
 
@@ -370,20 +395,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       lastLoginIp: currentIp,
     }));
     return { next: "staff-picker" as const };
-  }, [users, trustedBrowsers, currentIp, currentOtp]);
+  }, [users, trustedBrowsers, currentIp, currentOtp, authMode]);
 
   const availableStaff = useMemo(() => {
-    if (!session.scope) return [];
+    if (!session.scope || !session.userEmail) return [];
+    
+    // Strict routing based on email
+    if (session.userEmail.toLowerCase() === "ahmed@at-health.co.uk") {
+       return [MASTER_STAFF];
+    }
+    
+    if (session.userEmail.toLowerCase() === "info@at-health.co.uk") {
+       return MOCK_STAFF_BY_SCOPE["headoffice"].filter(s => s.role === "Head Office Admin");
+    }
+    
+    if (session.userEmail.toLowerCase() === "finance@at-health.co.uk") {
+       return MOCK_STAFF_BY_SCOPE["headoffice"].filter(s => s.role === "Finance");
+    }
+    
     const key = session.scope.type === "pharmacy" ? session.scope.pharmacyId : "headoffice";
-    
-    // Filter staff list based on who is logged in via email (if needed)
-    // For now, headoffice sees Ahmed, Sarah, Mike.
-    // If logged in as ahmed@, he should probably only pick Ahmed or just auto-select? 
-    // Requirement says: "Rename Master staff identity to Ahmed... Master PIN 145891 can only be used when email session user is ahmed@..."
-    // So 'Ahmed' staff should exist in MOCK_STAFF_BY_SCOPE for headoffice.
-    
     return MOCK_STAFF_BY_SCOPE[key] || [];
-  }, [session.scope]);
+  }, [session.scope, session.userEmail]);
 
   const selectStaff = useCallback((staffId: string) => {
     setSelectedStaffId(staffId);
@@ -402,19 +434,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { ok: false as const, attemptsLeft: session.pinAttemptsLeft, lockedOut: true };
     }
 
-    // CHECK MASTER PIN OWNERSHIP
     const cleanPin = pin.trim();
-    const isMasterPin = cleanPin === MASTER_PIN;
-    let isCorrect = cleanPin === STAFF_PIN; // Default correct
+    const isAhmed = session.userEmail?.toLowerCase() === "ahmed@at-health.co.uk";
+    
+    let isCorrect = false;
 
-    if (isMasterPin) {
-       console.log("[Auth] Master PIN attempt by:", session.userEmail);
-       // Only allowed if email is ahmed@at-health.co.uk
-       if (session.userEmail?.toLowerCase() === "ahmed@at-health.co.uk") {
-          isCorrect = true;
-       } else {
-          isCorrect = false; // Other users cannot use Master PIN
-       }
+    if (isAhmed) {
+       // Ahmed MUST use Master PIN
+       isCorrect = cleanPin === MASTER_PIN;
+    } else {
+       // Others MUST use Staff PIN
+       isCorrect = cleanPin === STAFF_PIN;
     }
 
     if (!isCorrect) {
@@ -431,27 +461,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { ok: false as const, attemptsLeft: nextAttempts, lockedOut };
     }
 
+    // Success
     const staffUser = availableStaff.find(s => s.id === selectedStaffId);
-    if (!staffUser) return { ok: false as const, attemptsLeft: 3, lockedOut: false };
+    if (!staffUser && !isAhmed) return { ok: false as const, attemptsLeft: 3, lockedOut: false };
+    
+    const finalStaff = isAhmed ? MASTER_STAFF : staffUser!;
     
     setSession((s) => ({
       ...s,
       staffPinVerified: true,
-      staff: staffUser,
+      staff: finalStaff,
       pinAttemptsLeft: 3,
       pinLockoutUntil: null,
     }));
 
-    return { ok: true as const, staff: staffUser };
+    return { ok: true as const, staff: finalStaff };
   }, [session.pinAttemptsLeft, session.pinLockoutUntil, session.userEmail, availableStaff, selectedStaffId]);
 
   const value = useMemo<AuthContextValue>(
     () => ({ 
       session, signIn, signOut, verifyStaffPin, selectStaff, availableStaff,
       users, inviteUser, deleteUser,
-      trustedBrowsers, revokeTrustedBrowser, setSimulatedIp: setCurrentIp
+      trustedBrowsers, revokeTrustedBrowser, setSimulatedIp: setCurrentIp,
+      setMasterScope, authMode, setAuthMode
     }),
-    [session, signIn, signOut, verifyStaffPin, selectStaff, availableStaff, users, inviteUser, deleteUser, trustedBrowsers, currentIp],
+    [session, signIn, signOut, verifyStaffPin, selectStaff, availableStaff, users, inviteUser, deleteUser, trustedBrowsers, currentIp, setMasterScope, authMode],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

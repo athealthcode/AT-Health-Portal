@@ -7,16 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { CalendarIcon, FileText, CheckCircle2, AlertCircle, ArrowLeft, ArrowRight, Calendar, Lock, MessageSquareWarning, ArrowUpRight, ArrowDownRight, Edit2 } from "lucide-react";
+import { CalendarIcon, FileText, CheckCircle2, AlertCircle, ArrowUpRight, ArrowDownRight, Edit2, Calendar, Lock } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { format } from "date-fns";
-import { useSubmittedDays } from "@/hooks/use-submitted-days";
+import { format, isFuture } from "date-fns";
 import { useAuth } from "@/state/auth";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Link, useLocation } from "wouter";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type ServiceField = { key: string; label: string; group: string; isCurrency?: boolean; subGroup?: string };
 
@@ -61,14 +58,7 @@ function normalizeFloat(v: string) {
   return v.replace(/[^0-9.]/g, "");
 }
 
-function formatCurrency(v: string | number) {
-  const num = typeof v === 'string' ? parseFloat(v) : v;
-  if (Number.isNaN(num)) return "£0.00";
-  return `£${num.toFixed(2)}`;
-}
-
 export default function DailyFigures() {
-  const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { session } = useAuth();
   
@@ -77,7 +67,7 @@ export default function DailyFigures() {
      "2026-03-01": { 
         user: "John Smith", 
         timestamp: new Date().getTime() - 86400000, 
-        values: { eps_rx_paid: 120, eps_rx_exempt: 340, paper_rx_paid: 10, paper_rx_exempt: 15, nhs_prepayment: "32.05" }
+        values: { eps_rx_paid: 120, eps_rx_exempt: 340, paper_rx_paid: 10, paper_rx_exempt: 15, eps_items_paid: 150, eps_items_exempt: 500, paper_items_paid: 12, paper_items_exempt: 20, nhs_prepayment: "32.05" }
      }
   });
 
@@ -89,13 +79,18 @@ export default function DailyFigures() {
   // Is this Head Office/Ahmed who can edit any day?
   const isHeadOffice = session.scope.type === "headoffice";
   
-  // State for view vs edit mode
+  const isFutureDate = date ? isFuture(date) && format(date, "yyyy-MM-dd") !== format(new Date(), "yyyy-MM-dd") : false;
+
   const [isEditingMode, setIsEditingMode] = useState(!existingRecord);
 
   // Re-evaluate editing mode when date changes
   useEffect(() => {
-     setIsEditingMode(!submittedData[formattedDate] || isHeadOffice);
-  }, [formattedDate, submittedData, isHeadOffice]);
+     if (isFutureDate) {
+        setIsEditingMode(false);
+     } else {
+        setIsEditingMode(!submittedData[formattedDate] || isHeadOffice);
+     }
+  }, [formattedDate, submittedData, isHeadOffice, isFutureDate]);
 
   // Values State
   const [values, setValues] = useState<Record<string, string | number>>(() => {
@@ -177,6 +172,7 @@ export default function DailyFigures() {
      let hasMissing = false;
 
      if (!date) return { global: "Trading date is required.", errors };
+     if (isFutureDate) return { global: "Cannot enter data for future dates.", errors };
 
      // Check missing fields (MUST explicitly enter 0)
      const allKeys = [...PRESCRIPTION_FIELDS.flatMap(f => [f.epsKey, f.paperKey]), ...OTHER_FIELDS.map(f => f.key)];
@@ -192,16 +188,13 @@ export default function DailyFigures() {
      const validatePrepMult = (key: string) => {
         if (values[key] === "" || values[key] == "0" || values[key] == "0.00") return;
         const val = Number(values[key]);
-        // Accepted NHS Prepayment multiples
         const m1 = 32.05;
         const m2 = 114.50;
-        const m3 = 19.80; // Added extra standard price
+        const m3 = 19.80; 
         
         const isM1 = Math.abs(val % m1) < 0.01;
         const isM2 = Math.abs(val % m2) < 0.01;
         const isM3 = Math.abs(val % m3) < 0.01;
-        // Basic check: is it a multiple of ANY of the accepted values or combination
-        // For strictness, let's just check if it's cleanly divisible by one of them
         
         if (!isM1 && !isM2 && !isM3) {
            errors[key] = `Must be a multiple of £32.05, £114.50, or £19.80`;
@@ -359,12 +352,13 @@ export default function DailyFigures() {
                            selected={date}
                            onSelect={setDate}
                            initialFocus
+                           disabled={(d) => isFuture(d) && format(d, "yyyy-MM-dd") !== format(new Date(), "yyyy-MM-dd")}
                         />
                      </PopoverContent>
                   </Popover>
 
                   {/* Manager Only: Mark not completed */}
-                  {(session.role === "Pharmacy Manager" || isHeadOffice) && !existingRecord && (
+                  {(session.role === "Pharmacy Manager" || isHeadOffice) && !existingRecord && !isFutureDate && (
                      <Dialog open={notCompletedOpen} onOpenChange={setNotCompletedOpen}>
                         <DialogTrigger asChild>
                            <Button variant="outline" className="text-amber-600 border-amber-200 hover:bg-amber-50">
@@ -403,7 +397,13 @@ export default function DailyFigures() {
                </div>
             )}
 
-            {existingRecord && existingRecord.status === 'not_completed' ? (
+            {isFutureDate ? (
+               <Card className="p-12 text-center border-dashed bg-muted/30">
+                  <CalendarIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+                  <h3 className="font-semibold text-lg text-muted-foreground">Future Date</h3>
+                  <p className="text-sm text-muted-foreground mt-1">Data cannot be entered for future dates.</p>
+               </Card>
+            ) : existingRecord && existingRecord.status === 'not_completed' ? (
                <Card className="p-8 text-center border-dashed bg-muted/30">
                   <AlertCircle className="h-10 w-10 text-amber-500 mx-auto mb-3" />
                   <h3 className="font-semibold text-lg">Marked as Not Completed</h3>
@@ -416,16 +416,113 @@ export default function DailyFigures() {
                      </Button>
                   )}
                </Card>
-            ) : (
-               <div className={!isEditingMode ? "pointer-events-none opacity-80" : ""}>
-                  {!isEditingMode && !isHeadOffice && (
-                     <div className="mb-4 bg-blue-50 border border-blue-200 text-blue-800 p-3 rounded-xl flex items-center gap-3 text-sm">
-                        <Lock className="h-4 w-4 shrink-0" />
-                        Figures have been submitted for this date and are now view-only.
+            ) : !isEditingMode ? (
+               // VIEW ONLY SUMMARY MODE
+               <div className="space-y-4">
+                  {!isHeadOffice && (
+                     <div className="bg-blue-50 border border-blue-200 text-blue-800 p-3 rounded-xl flex items-center gap-3 text-sm">
+                        <Lock className="h-4 w-4 shrink-0" /> Figures have been submitted for this date and are view-only.
                      </div>
                   )}
 
-                  {/* PRESCRIPTION FIGURES GRID */}
+                  <Card className="rounded-2xl border bg-card/60 p-6 shadow-sm">
+                     <div className="flex items-center justify-between mb-6 border-b pb-4">
+                        <h3 className="font-semibold text-lg">Daily Figures Summary</h3>
+                        {isHeadOffice && (
+                           <Button variant="outline" size="sm" onClick={() => setIsEditingMode(true)}>
+                              <Edit2 className="h-4 w-4 mr-2" /> Edit Data
+                           </Button>
+                        )}
+                     </div>
+
+                     <div className="grid md:grid-cols-2 gap-8">
+                        {/* Prescription Stats */}
+                        <div className="space-y-4">
+                           <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Prescriptions & Items</div>
+                           
+                           <div className="bg-background/50 rounded-xl border p-4 space-y-4">
+                              <div className="grid grid-cols-2 gap-4">
+                                 <div>
+                                    <div className="text-[10px] text-muted-foreground uppercase mb-1">Total Rx</div>
+                                    <div className="font-mono text-xl font-medium">
+                                       {(Number(values["eps_rx_paid"] || 0) + Number(values["eps_rx_exempt"] || 0) + Number(values["paper_rx_paid"] || 0) + Number(values["paper_rx_exempt"] || 0)).toLocaleString()}
+                                    </div>
+                                 </div>
+                                 <div>
+                                    <div className="text-[10px] text-muted-foreground uppercase mb-1">Total Items</div>
+                                    <div className="font-mono text-xl font-medium">
+                                       {(Number(values["eps_items_paid"] || 0) + Number(values["eps_items_exempt"] || 0) + Number(values["paper_items_paid"] || 0) + Number(values["paper_items_exempt"] || 0)).toLocaleString()}
+                                    </div>
+                                 </div>
+                              </div>
+                              
+                              <Separator />
+                              
+                              <div className="space-y-2">
+                                 <div className="flex justify-between text-sm">
+                                    <span className="text-muted-foreground">Paid Rx / Items</span>
+                                    <span className="font-mono">
+                                       {(Number(values["eps_rx_paid"] || 0) + Number(values["paper_rx_paid"] || 0))} / {(Number(values["eps_items_paid"] || 0) + Number(values["paper_items_paid"] || 0))}
+                                    </span>
+                                 </div>
+                                 <div className="flex justify-between text-sm">
+                                    <span className="text-muted-foreground">Exempt Rx / Items</span>
+                                    <span className="font-mono">
+                                       {(Number(values["eps_rx_exempt"] || 0) + Number(values["paper_rx_exempt"] || 0))} / {(Number(values["eps_items_exempt"] || 0) + Number(values["paper_items_exempt"] || 0))}
+                                    </span>
+                                 </div>
+                              </div>
+                           </div>
+
+                           <div className="grid grid-cols-2 gap-4 mt-4">
+                              <div className="bg-background/50 rounded-xl border p-3">
+                                 <div className="text-xs text-muted-foreground mb-1">NHS Prepayment</div>
+                                 <div className="font-mono font-medium text-lg">£{Number(values["nhs_prepayment"] || 0).toFixed(2)}</div>
+                              </div>
+                              <div className="bg-background/50 rounded-xl border p-3">
+                                 <div className="text-xs text-muted-foreground mb-1">FP57 Refund</div>
+                                 <div className="font-mono font-medium text-lg">£{Number(values["fp57_refund"] || 0).toFixed(2)}</div>
+                              </div>
+                           </div>
+                        </div>
+
+                        {/* Services Stats */}
+                        <div className="space-y-4">
+                           <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Clinical Services</div>
+                           
+                           <div className="bg-background/50 rounded-xl border p-4 space-y-3">
+                              {Object.entries(groupedOther).filter(([g]) => g !== "Figures").map(([group, fields]) => {
+                                 const groupTotal = fields.reduce((sum, f) => sum + Number(values[f.key] || 0), 0);
+                                 if (groupTotal === 0) return null;
+                                 
+                                 return (
+                                    <div key={group}>
+                                       <div className="flex justify-between items-end mb-1">
+                                          <span className="text-xs font-medium">{group}</span>
+                                          <span className="font-mono font-bold text-sm">{groupTotal}</span>
+                                       </div>
+                                       <div className="space-y-1 ml-2">
+                                          {fields.filter(f => Number(values[f.key] || 0) > 0).map(f => (
+                                             <div key={f.key} className="flex justify-between text-[10px] text-muted-foreground">
+                                                <span>{f.label}</span>
+                                                <span className="font-mono">{values[f.key]}</span>
+                                             </div>
+                                          ))}
+                                       </div>
+                                    </div>
+                                 )
+                              })}
+                              {Object.entries(groupedOther).filter(([g]) => g !== "Figures").every(([g, fields]) => fields.reduce((s, f) => s + Number(values[f.key] || 0), 0) === 0) && (
+                                 <div className="text-sm text-muted-foreground italic py-2">No clinical services recorded today.</div>
+                              )}
+                           </div>
+                        </div>
+                     </div>
+                  </Card>
+               </div>
+            ) : (
+               <div className="space-y-4">
+                  {/* EDIT MODE */}
                   <Card className="rounded-2xl border bg-card/60 p-5 overflow-hidden shadow-sm" data-testid="card-group-prescription">
                      <div className="flex items-center gap-2 mb-5">
                         <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
@@ -450,7 +547,6 @@ export default function DailyFigures() {
                                       className={`h-10 text-center font-mono ${validationErrors["eps_rx_paid"] ? "border-destructive ring-destructive/20 focus-visible:ring-destructive/20" : "border-primary/20 focus-visible:ring-primary/20"}`}
                                       value={values["eps_rx_paid"]}
                                       onChange={e => updateValue("eps_rx_paid", e.target.value)}
-                                      readOnly={!isEditingMode}
                                    />
                                    {validationErrors["eps_rx_paid"] && <div className="text-[10px] text-destructive text-center">{validationErrors["eps_rx_paid"]}</div>}
                                 </div>
@@ -459,7 +555,6 @@ export default function DailyFigures() {
                                       className={`h-10 text-center font-mono ${validationErrors["paper_rx_paid"] ? "border-destructive ring-destructive/20" : ""}`}
                                       value={values["paper_rx_paid"]}
                                       onChange={e => updateValue("paper_rx_paid", e.target.value)}
-                                      readOnly={!isEditingMode}
                                    />
                                    {validationErrors["paper_rx_paid"] && <div className="text-[10px] text-destructive text-center">{validationErrors["paper_rx_paid"]}</div>}
                                 </div>
@@ -471,7 +566,6 @@ export default function DailyFigures() {
                                       className={`h-10 text-center font-mono ${validationErrors["eps_items_paid"] ? "border-destructive ring-destructive/20" : "border-primary/20"}`}
                                       value={values["eps_items_paid"]}
                                       onChange={e => updateValue("eps_items_paid", e.target.value)}
-                                      readOnly={!isEditingMode}
                                    />
                                    {validationErrors["eps_items_paid"] && <div className="text-[10px] text-destructive text-center">{validationErrors["eps_items_paid"]}</div>}
                                 </div>
@@ -480,7 +574,6 @@ export default function DailyFigures() {
                                       className={`h-10 text-center font-mono ${validationErrors["paper_items_paid"] ? "border-destructive ring-destructive/20" : ""}`}
                                       value={values["paper_items_paid"]}
                                       onChange={e => updateValue("paper_items_paid", e.target.value)}
-                                      readOnly={!isEditingMode}
                                    />
                                    {validationErrors["paper_items_paid"] && <div className="text-[10px] text-destructive text-center">{validationErrors["paper_items_paid"]}</div>}
                                 </div>
@@ -498,7 +591,6 @@ export default function DailyFigures() {
                                       className={`h-10 text-center font-mono ${validationErrors["eps_rx_exempt"] ? "border-destructive ring-destructive/20" : "border-primary/20"}`}
                                       value={values["eps_rx_exempt"]}
                                       onChange={e => updateValue("eps_rx_exempt", e.target.value)}
-                                      readOnly={!isEditingMode}
                                    />
                                    {validationErrors["eps_rx_exempt"] && <div className="text-[10px] text-destructive text-center">{validationErrors["eps_rx_exempt"]}</div>}
                                 </div>
@@ -507,7 +599,6 @@ export default function DailyFigures() {
                                       className={`h-10 text-center font-mono ${validationErrors["paper_rx_exempt"] ? "border-destructive ring-destructive/20" : ""}`}
                                       value={values["paper_rx_exempt"]}
                                       onChange={e => updateValue("paper_rx_exempt", e.target.value)}
-                                      readOnly={!isEditingMode}
                                    />
                                    {validationErrors["paper_rx_exempt"] && <div className="text-[10px] text-destructive text-center">{validationErrors["paper_rx_exempt"]}</div>}
                                 </div>
@@ -519,7 +610,6 @@ export default function DailyFigures() {
                                       className={`h-10 text-center font-mono ${validationErrors["eps_items_exempt"] ? "border-destructive ring-destructive/20" : "border-primary/20"}`}
                                       value={values["eps_items_exempt"]}
                                       onChange={e => updateValue("eps_items_exempt", e.target.value)}
-                                      readOnly={!isEditingMode}
                                    />
                                    {validationErrors["eps_items_exempt"] && <div className="text-[10px] text-destructive text-center">{validationErrors["eps_items_exempt"]}</div>}
                                 </div>
@@ -528,7 +618,6 @@ export default function DailyFigures() {
                                       className={`h-10 text-center font-mono ${validationErrors["paper_items_exempt"] ? "border-destructive ring-destructive/20" : ""}`}
                                       value={values["paper_items_exempt"]}
                                       onChange={e => updateValue("paper_items_exempt", e.target.value)}
-                                      readOnly={!isEditingMode}
                                    />
                                    {validationErrors["paper_items_exempt"] && <div className="text-[10px] text-destructive text-center">{validationErrors["paper_items_exempt"]}</div>}
                                 </div>
@@ -539,7 +628,7 @@ export default function DailyFigures() {
 
                   {/* OTHER SECTIONS */}
                   {Object.entries(groupedOther).map(([group, groupFields]) => (
-                    <Card key={group} className="rounded-2xl border bg-card/60 p-5 mt-4 shadow-sm" data-testid={`card-group-${group}`}>
+                    <Card key={group} className="rounded-2xl border bg-card/60 p-5 shadow-sm" data-testid={`card-group-${group}`}>
                       <div className="flex items-center justify-between mb-4">
                         <div className="text-sm font-semibold tracking-wide text-foreground uppercase">
                           {group}
@@ -563,7 +652,6 @@ export default function DailyFigures() {
                                  onChange={(e) => updateValue(f.key, e.target.value, f.isCurrency)}
                                  onBlur={() => handleBlur(f.key, f.isCurrency || false)}
                                  data-testid={`input-${f.key}`}
-                                 readOnly={!isEditingMode}
                                />
                             </div>
                             {validationErrors[f.key] && (
@@ -577,13 +665,11 @@ export default function DailyFigures() {
                     </Card>
                   ))}
                   
-                  {isEditingMode && (
-                     <div className="mt-6 flex justify-end">
-                        <Button size="lg" className="w-full md:w-auto px-8" onClick={handleSubmit}>
-                           Submit Daily Figures
-                        </Button>
-                     </div>
-                  )}
+                  <div className="mt-6 flex justify-end">
+                     <Button size="lg" className="w-full md:w-auto px-8" onClick={handleSubmit}>
+                        Submit Daily Figures
+                     </Button>
+                  </div>
                </div>
             )}
           </div>

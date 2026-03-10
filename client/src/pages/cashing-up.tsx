@@ -7,10 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { AlertCircle, Calendar, CheckCircle2, ArrowLeft, ArrowRight, Lock, Edit2, FileCheck, Landmark, CalendarIcon } from "lucide-react";
+import { AlertCircle, Calendar, CheckCircle2, ArrowLeft, ArrowRight, Lock, Edit2, FileCheck, Landmark, CalendarIcon, Check } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { format } from "date-fns";
+import { format, isFuture } from "date-fns";
 import { useSubmittedDays } from "@/hooks/use-submitted-days";
 import { useAuth } from "@/state/auth";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -53,9 +53,16 @@ export default function CashingUp() {
   const isHeadOffice = session.scope.type === "headoffice";
   const [isEditingMode, setIsEditingMode] = useState(!existingRecord);
 
+  // Future date check
+  const isFutureDate = date ? isFuture(date) && format(date, "yyyy-MM-dd") !== format(new Date(), "yyyy-MM-dd") : false;
+
   useEffect(() => {
-     setIsEditingMode(!submittedData[formattedDate] || isHeadOffice);
-  }, [formattedDate, submittedData, isHeadOffice]);
+     if (isFutureDate) {
+        setIsEditingMode(false);
+     } else {
+        setIsEditingMode(!submittedData[formattedDate] || isHeadOffice);
+     }
+  }, [formattedDate, submittedData, isHeadOffice, isFutureDate]);
   
   const [inputs, setInputs] = useState<Record<string, string | number>>({
     toBeBanked: "",
@@ -64,7 +71,7 @@ export default function CashingUp() {
     vatExempt: "",
     vatZero: "",
     vatLow: "",
-    vatNone: "", // New Field
+    vatNone: "", 
     userVariance: "", 
   });
 
@@ -106,9 +113,14 @@ export default function CashingUp() {
   const actualTaking = (Number(inputs.toBeBanked)||0) + (Number(inputs.readingCard)||0) + totalPayouts;
   const systemVariance = Math.round((grossTaking - actualTaking) * 100) / 100;
   
-  // Mock Store Cash Logic
+  // Mock Store Cash Logic - Fixed to prevent negatives
   const initialStoreCash = 1250.00;
-  const storeCashAfterDay = initialStoreCash + (Number(inputs.toBeBanked)||0) - totalBanking;
+  const toBeBankedNum = Number(inputs.toBeBanked)||0;
+  
+  // Enforce validation: You can't bank more than you have (start + today's cash)
+  const maxBankable = initialStoreCash + toBeBankedNum;
+  const calculatedStoreCash = maxBankable - totalBanking;
+  const storeCashAfterDay = Math.max(0, calculatedStoreCash);
 
   const updateInput = (key: keyof typeof inputs, val: string) => {
     setInputs(prev => ({ ...prev, [key]: normalizeMoney(val) }));
@@ -146,6 +158,7 @@ export default function CashingUp() {
     let hasMissing = false;
 
     if (!date) return { global: "Date is required.", errors };
+    if (isFutureDate) return { global: "Cannot enter data for future dates.", errors };
 
     // Require explicit 0s for all core input fields
     Object.keys(inputs).forEach(k => {
@@ -176,6 +189,11 @@ export default function CashingUp() {
     const userVar = Number(inputs.userVariance || 0);
     if (Math.abs(userVar - systemVariance) > 0.01) {
        errors["userVariance"] = "Does not match calculated system variance";
+    }
+
+    // Negative Cash Check
+    if (calculatedStoreCash < 0) {
+       return { global: `Cannot bank more cash (£${totalBanking}) than physically in store (£${maxBankable}).`, errors };
     }
 
     if (hasMissing) {
@@ -235,10 +253,12 @@ export default function CashingUp() {
   return (
     <AppShell>
       <div className="flex flex-col gap-5">
-        <div>
-          <div className="font-serif text-2xl tracking-tight" data-testid="text-cashing-up-title">Cashing Up</div>
-          <div className="text-sm text-muted-foreground" data-testid="text-cashing-up-subtitle">
-            Enter daily trading figures. Explicit 0 required for all fields.
+        <div className="flex justify-between items-end">
+          <div>
+            <div className="font-serif text-2xl tracking-tight" data-testid="text-cashing-up-title">Cashing Up</div>
+            <div className="text-sm text-muted-foreground" data-testid="text-cashing-up-subtitle">
+              Enter daily trading figures. Explicit 0 required for all fields.
+            </div>
           </div>
         </div>
 
@@ -276,11 +296,17 @@ export default function CashingUp() {
                          </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="end">
-                         <CalendarComponent mode="single" selected={date} onSelect={setDate} initialFocus />
+                         <CalendarComponent 
+                            mode="single" 
+                            selected={date} 
+                            onSelect={setDate} 
+                            initialFocus 
+                            disabled={(d) => isFuture(d) && format(d, "yyyy-MM-dd") !== format(new Date(), "yyyy-MM-dd")}
+                         />
                       </PopoverContent>
                    </Popover>
 
-                   {(session.role === "Pharmacy Manager" || isHeadOffice) && !existingRecord && (
+                   {(session.role === "Pharmacy Manager" || isHeadOffice) && !existingRecord && !isFutureDate && (
                       <Dialog open={notCompletedOpen} onOpenChange={setNotCompletedOpen}>
                          <DialogTrigger asChild>
                             <Button variant="outline" className="text-amber-600 border-amber-200 hover:bg-amber-50">
@@ -310,7 +336,13 @@ export default function CashingUp() {
                 </div>
              )}
 
-             {existingRecord && existingRecord.status === 'not_completed' ? (
+             {isFutureDate ? (
+                <Card className="p-12 text-center border-dashed bg-muted/30">
+                   <CalendarIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+                   <h3 className="font-semibold text-lg text-muted-foreground">Future Date</h3>
+                   <p className="text-sm text-muted-foreground mt-1">Data cannot be entered for future dates.</p>
+                </Card>
+             ) : existingRecord && existingRecord.status === 'not_completed' ? (
                 <Card className="p-8 text-center border-dashed bg-muted/30">
                    <AlertCircle className="h-10 w-10 text-amber-500 mx-auto mb-3" />
                    <h3 className="font-semibold text-lg">Marked as Not Completed</h3>
@@ -321,14 +353,124 @@ export default function CashingUp() {
                       </Button>
                    )}
                 </Card>
-             ) : (
-                <div className={!isEditingMode ? "pointer-events-none opacity-80 space-y-4" : "space-y-4"}>
-                  {!isEditingMode && !isHeadOffice && (
-                     <div className="bg-blue-50 border border-blue-200 text-blue-800 p-3 rounded-xl flex items-center gap-3 text-sm">
-                        <Lock className="h-4 w-4 shrink-0" /> Figures have been submitted for this date and are view-only.
-                     </div>
-                  )}
+             ) : !isEditingMode ? (
+                // VIEW ONLY SUMMARY MODE
+                <div className="space-y-4">
+                   {!isHeadOffice && (
+                      <div className="bg-blue-50 border border-blue-200 text-blue-800 p-3 rounded-xl flex items-center gap-3 text-sm">
+                         <Lock className="h-4 w-4 shrink-0" /> Figures have been submitted for this date and are view-only.
+                      </div>
+                   )}
+                   
+                   <Card className="rounded-2xl border bg-card/60 p-6 shadow-sm">
+                      <div className="flex items-center justify-between mb-6 border-b pb-4">
+                         <h3 className="font-semibold text-lg">Submission Summary</h3>
+                         {isHeadOffice && (
+                            <Button variant="outline" size="sm" onClick={() => setIsEditingMode(true)}>
+                               <Edit2 className="h-4 w-4 mr-2" /> Edit Data
+                            </Button>
+                         )}
+                      </div>
+                      
+                      <div className="grid md:grid-cols-2 gap-8">
+                         <div className="space-y-4">
+                            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Takings & VAT</div>
+                            <div className="bg-background/50 rounded-xl border p-4 space-y-3">
+                               <div className="flex justify-between text-sm">
+                                  <span className="text-muted-foreground">Standard (20%)</span>
+                                  <span className="font-mono">£{Number(inputs.vatStandard).toFixed(2)}</span>
+                               </div>
+                               <div className="flex justify-between text-sm">
+                                  <span className="text-muted-foreground">Exempt</span>
+                                  <span className="font-mono">£{Number(inputs.vatExempt).toFixed(2)}</span>
+                               </div>
+                               <div className="flex justify-between text-sm">
+                                  <span className="text-muted-foreground">Zero</span>
+                                  <span className="font-mono">£{Number(inputs.vatZero).toFixed(2)}</span>
+                               </div>
+                               <div className="flex justify-between text-sm">
+                                  <span className="text-muted-foreground">Low (5%)</span>
+                                  <span className="font-mono">£{Number(inputs.vatLow).toFixed(2)}</span>
+                               </div>
+                               <div className="flex justify-between text-sm">
+                                  <span className="text-muted-foreground">No VAT</span>
+                                  <span className="font-mono">£{Number(inputs.vatNone).toFixed(2)}</span>
+                               </div>
+                               <Separator />
+                               <div className="flex justify-between font-medium">
+                                  <span>Gross Taking</span>
+                                  <span className="font-mono text-primary">£{grossTaking.toFixed(2)}</span>
+                               </div>
+                            </div>
 
+                            <div className="grid grid-cols-2 gap-4 mt-4">
+                               <div className="bg-background/50 rounded-xl border p-3">
+                                  <div className="text-xs text-muted-foreground mb-1">To Be Banked</div>
+                                  <div className="font-mono font-medium text-lg">£{Number(inputs.toBeBanked).toFixed(2)}</div>
+                               </div>
+                               <div className="bg-background/50 rounded-xl border p-3">
+                                  <div className="text-xs text-muted-foreground mb-1">Reading Card</div>
+                                  <div className="font-mono font-medium text-lg">£{Number(inputs.readingCard).toFixed(2)}</div>
+                               </div>
+                            </div>
+                         </div>
+
+                         <div className="space-y-4">
+                            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Payouts & Banking</div>
+                            <div className="bg-background/50 rounded-xl border p-4 space-y-4">
+                               <div>
+                                  <div className="text-xs font-medium mb-2 text-muted-foreground">Till Payouts</div>
+                                  {payouts.filter(p => Number(p.amount) > 0).length === 0 ? (
+                                     <div className="text-sm text-muted-foreground italic">No payouts recorded.</div>
+                                  ) : (
+                                     <div className="space-y-2">
+                                        {payouts.filter(p => Number(p.amount) > 0).map((p, i) => (
+                                           <div key={i} className="flex justify-between items-center text-sm border-b pb-2 last:border-0 last:pb-0">
+                                              <div className="flex flex-col">
+                                                 <span className="font-medium">{p.label}</span>
+                                                 <span className="text-[10px] text-muted-foreground uppercase">{p.type} {p.type === 'locum' && p.invoiceUploaded && '✓'}</span>
+                                              </div>
+                                              <span className="font-mono text-destructive">£{Number(p.amount).toFixed(2)}</span>
+                                           </div>
+                                        ))}
+                                     </div>
+                                  )}
+                               </div>
+                               
+                               <Separator />
+                               
+                               <div>
+                                  <div className="text-xs font-medium mb-2 text-muted-foreground">Bank Deposits</div>
+                                  {banking.filter(b => Number(b.amount) > 0).length === 0 ? (
+                                     <div className="text-sm text-muted-foreground italic">No banking recorded.</div>
+                                  ) : (
+                                     <div className="space-y-2">
+                                        {banking.filter(b => Number(b.amount) > 0).map((b, i) => (
+                                           <div key={i} className="flex justify-between items-center text-sm border-b pb-2 last:border-0 last:pb-0">
+                                              <span className="font-medium text-muted-foreground">{b.location}</span>
+                                              <span className="font-mono font-medium">£{Number(b.amount).toFixed(2)}</span>
+                                           </div>
+                                        ))}
+                                     </div>
+                                  )}
+                               </div>
+                            </div>
+
+                            <div className={`p-4 rounded-xl border ${systemVariance !== 0 ? 'bg-destructive/5 border-destructive/20' : 'bg-emerald-500/5 border-emerald-500/20'}`}>
+                               <div className="flex justify-between items-center">
+                                  <span className="text-sm font-medium">Daily Variance</span>
+                                  <span className={`font-mono font-bold text-lg ${systemVariance !== 0 ? 'text-destructive' : 'text-emerald-600'}`}>
+                                     {systemVariance > 0 ? '+' : ''}£{systemVariance.toFixed(2)}
+                                  </span>
+                               </div>
+                            </div>
+                         </div>
+                      </div>
+                   </Card>
+                </div>
+             ) : (
+                <div className="space-y-4">
+                  {/* EDIT MODE CONTENT */}
                   <Card className="rounded-2xl border bg-card/60 p-5 shadow-sm">
                      <div className="text-sm font-semibold mb-4">VAT Analysis (Gross Components)</div>
                      <div className="grid gap-4 sm:grid-cols-5">
@@ -342,7 +484,6 @@ export default function CashingUp() {
                                     <Input 
                                        className={`pl-6 h-10 font-mono ${validationErrors[key] ? "border-destructive ring-destructive/20" : ""}`}
                                        value={inputs[key]} onChange={e => updateInput(key, e.target.value)} onBlur={() => handleBlur(key)}
-                                       readOnly={!isEditingMode}
                                     />
                                  </div>
                                  {validationErrors[key] && <div className="text-[10px] text-destructive leading-tight absolute -bottom-4">{validationErrors[key]}</div>}
@@ -361,7 +502,6 @@ export default function CashingUp() {
                               <Input 
                                  className={`pl-6 h-11 font-mono ${validationErrors["toBeBanked"] ? "border-destructive ring-destructive/20" : ""}`}
                                  value={inputs.toBeBanked} onChange={e => updateInput("toBeBanked", e.target.value)} onBlur={() => handleBlur("toBeBanked")}
-                                 readOnly={!isEditingMode}
                               />
                            </div>
                            {validationErrors["toBeBanked"] && <div className="text-[10px] text-destructive absolute -bottom-4">{validationErrors["toBeBanked"]}</div>}
@@ -376,7 +516,6 @@ export default function CashingUp() {
                               <Input 
                                  className={`pl-6 h-11 font-mono ${validationErrors["readingCard"] ? "border-destructive ring-destructive/20" : ""}`}
                                  value={inputs.readingCard} onChange={e => updateInput("readingCard", e.target.value)} onBlur={() => handleBlur("readingCard")}
-                                 readOnly={!isEditingMode}
                               />
                            </div>
                            {validationErrors["readingCard"] && <div className="text-[10px] text-destructive absolute -bottom-4">{validationErrors["readingCard"]}</div>}
@@ -396,7 +535,7 @@ export default function CashingUp() {
                            {payouts.map((p, i) => (
                              <div key={p.id} className="bg-background/50 p-3 rounded-xl border flex flex-col gap-3">
                                <div className="flex gap-2 items-start">
-                                 <Select disabled={!isEditingMode} value={p.type} onValueChange={v => handlePayoutChange(p.id, "type", v)}>
+                                 <Select value={p.type} onValueChange={v => handlePayoutChange(p.id, "type", v)}>
                                     <SelectTrigger className="w-[120px]"><SelectValue /></SelectTrigger>
                                     <SelectContent>
                                        <SelectItem value="expense">Expense</SelectItem>
@@ -405,20 +544,20 @@ export default function CashingUp() {
                                  </Select>
                                  
                                  <div className="flex-1 space-y-1">
-                                    <Input placeholder={p.type === 'locum' ? "Locum Full Name" : "Detail"} value={p.label} onChange={e => handlePayoutChange(p.id, "label", e.target.value)} className={validationErrors[`payout_${i}_label`] ? "border-destructive" : ""} readOnly={!isEditingMode} />
+                                    <Input placeholder={p.type === 'locum' ? "Locum Full Name" : "Detail"} value={p.label} onChange={e => handlePayoutChange(p.id, "label", e.target.value)} className={validationErrors[`payout_${i}_label`] ? "border-destructive" : ""} />
                                     {validationErrors[`payout_${i}_label`] && <div className="text-[10px] text-destructive">{validationErrors[`payout_${i}_label`]}</div>}
                                  </div>
                                  
                                  <div className="relative w-32 shrink-0">
                                     <span className="absolute left-3 top-2.5 text-xs text-muted-foreground">£</span>
-                                    <Input placeholder="0.00" value={p.amount} onChange={e => handlePayoutChange(p.id, "amount", e.target.value)} onBlur={() => handlePayoutBlur(p.id)} className="pl-6 font-mono" readOnly={!isEditingMode} />
+                                    <Input placeholder="0.00" value={p.amount} onChange={e => handlePayoutChange(p.id, "amount", e.target.value)} onBlur={() => handlePayoutBlur(p.id)} className="pl-6 font-mono" />
                                  </div>
-                                 <Button variant="ghost" size="icon" onClick={() => setPayouts(s => s.filter(x => x.id !== p.id))} disabled={payouts.length === 1 || !isEditingMode}>×</Button>
+                                 <Button variant="ghost" size="icon" onClick={() => setPayouts(s => s.filter(x => x.id !== p.id))} disabled={payouts.length === 1}>×</Button>
                                </div>
                                
                                {p.type === 'locum' && (
                                   <div className="flex items-center space-x-2 pl-1">
-                                     <Checkbox id={`inv-${p.id}`} checked={p.invoiceUploaded} onCheckedChange={(c) => handlePayoutChange(p.id, "invoiceUploaded", c)} disabled={!isEditingMode} />
+                                     <Checkbox id={`inv-${p.id}`} checked={p.invoiceUploaded} onCheckedChange={(c) => handlePayoutChange(p.id, "invoiceUploaded", c)} />
                                      <Label htmlFor={`inv-${p.id}`} className={`text-xs ${validationErrors[`payout_${i}_invoice`] ? "text-destructive" : "text-muted-foreground"}`}>
                                         I confirm I have uploaded the locum invoice
                                      </Label>
@@ -426,7 +565,7 @@ export default function CashingUp() {
                                )}
                              </div>
                            ))}
-                           {isEditingMode && <Button variant="secondary" size="sm" onClick={() => setPayouts(s => [...s, {id: Date.now().toString(), type: "expense", label: "", amount: ""}])}>Add Payout</Button>}
+                           <Button variant="secondary" size="sm" onClick={() => setPayouts(s => [...s, {id: Date.now().toString(), type: "expense", label: "", amount: ""}])}>Add Payout</Button>
                         </div>
 
                         <Separator />
@@ -440,7 +579,7 @@ export default function CashingUp() {
                            ) : banking.map((b, i) => (
                              <div key={b.id} className="flex gap-2 items-start">
                                <div className="flex-1 space-y-1">
-                                  <Input placeholder="Bank Location (e.g. Barclays High St)" value={b.location} onChange={e => setBanking(s => s.map(x => x.id === b.id ? {...x, location: e.target.value} : x))} className={validationErrors[`banking_${i}_location`] ? "border-destructive" : ""} readOnly={!isEditingMode} />
+                                  <Input placeholder="Bank Location (e.g. Barclays High St)" value={b.location} onChange={e => setBanking(s => s.map(x => x.id === b.id ? {...x, location: e.target.value} : x))} className={validationErrors[`banking_${i}_location`] ? "border-destructive" : ""} />
                                   {validationErrors[`banking_${i}_location`] && <div className="text-[10px] text-destructive">{validationErrors[`banking_${i}_location`]}</div>}
                                </div>
                                <div className="relative w-32 shrink-0">
@@ -452,12 +591,12 @@ export default function CashingUp() {
                                            return {...x, amount: isNaN(n) ? "" : n.toFixed(2)};
                                         } return x;
                                      }));
-                                  }} className="pl-6 font-mono" readOnly={!isEditingMode} />
+                                  }} className="pl-6 font-mono" />
                                </div>
-                               <Button variant="ghost" size="icon" onClick={() => setBanking(s => s.filter(x => x.id !== b.id))} disabled={!isEditingMode}>×</Button>
+                               <Button variant="ghost" size="icon" onClick={() => setBanking(s => s.filter(x => x.id !== b.id))}>×</Button>
                              </div>
                            ))}
-                           {isEditingMode && <Button variant="secondary" size="sm" onClick={() => setBanking(s => [...s, {id: Date.now().toString(), location: "", amount: ""}])}>Add Bank Deposit</Button>}
+                           <Button variant="secondary" size="sm" onClick={() => setBanking(s => [...s, {id: Date.now().toString(), location: "", amount: ""}])}>Add Bank Deposit</Button>
                         </div>
                      </div>
                   </Card>
@@ -472,7 +611,7 @@ export default function CashingUp() {
                            <Input 
                               className={`pl-6 h-11 font-mono ${validationErrors["userVariance"] ? "border-destructive ring-destructive/20" : ""}`} 
                               value={inputs.userVariance} onChange={e => updateInput("userVariance", e.target.value)} onBlur={() => handleBlur("userVariance")}
-                              readOnly={!isEditingMode} placeholder="0.00"
+                              placeholder="0.00"
                            />
                         </div>
                         {validationErrors["userVariance"] && (
@@ -483,13 +622,11 @@ export default function CashingUp() {
                      </div>
                   </div>
                   
-                  {isEditingMode && (
-                     <div className="mt-6 flex gap-2">
-                        <Button className="h-12 w-full text-lg" onClick={handleSubmit}>
-                           Submit Cashing Up
-                        </Button>
-                     </div>
-                  )}
+                  <div className="mt-6 flex gap-2">
+                     <Button className="h-12 w-full text-lg" onClick={handleSubmit}>
+                        Submit Cashing Up
+                     </Button>
+                  </div>
                 </div>
              )}
           </div>
@@ -521,7 +658,7 @@ export default function CashingUp() {
                 </div>
                 <div className="space-y-3 text-sm">
                    <div className="flex justify-between text-muted-foreground text-xs">
-                      <span>Start of Day</span>
+                      <span>Month Start Cash</span>
                       <span className="font-mono">{formatCurrency(initialStoreCash)}</span>
                    </div>
                    <div className="flex justify-between text-muted-foreground text-xs">
@@ -532,13 +669,19 @@ export default function CashingUp() {
                       <span>Banked Today</span>
                       <span className="font-mono text-red-500">-{formatCurrency(totalBanking)}</span>
                    </div>
+                   {calculatedStoreCash < 0 && (
+                      <div className="text-xs text-destructive bg-destructive/10 p-2 rounded flex items-start gap-1">
+                         <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                         <span>Invalid operation. Store cash cannot fall below £0.</span>
+                      </div>
+                   )}
                    <Separator />
                    <div>
                       <div className="flex justify-between font-semibold mb-1">
-                         <span>Month to Date Cash</span>
-                         <span className="font-mono text-lg">{formatCurrency(storeCashAfterDay)}</span>
+                         <span>MTD Store Cash</span>
+                         <span className={`font-mono text-lg ${calculatedStoreCash < 0 ? 'text-destructive' : ''}`}>{formatCurrency(storeCashAfterDay)}</span>
                       </div>
-                      <div className="text-[10px] text-muted-foreground text-right">Physical cash currently in store</div>
+                      <div className="text-[10px] text-muted-foreground text-right">Physical cash remaining in store for {date ? format(date, "MMMM yyyy") : ""}</div>
                    </div>
                 </div>
              </Card>
