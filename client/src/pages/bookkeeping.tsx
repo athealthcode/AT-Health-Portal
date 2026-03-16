@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CheckCircle2, ChevronRight, FileCheck, Lock, Unlock, X, AlertTriangle, Info, Clock } from "lucide-react";
+import { CheckCircle2, ChevronRight, FileCheck, Lock, Unlock, X, AlertTriangle, Info, Clock, Building2 } from "lucide-react";
 import { useAuth } from "@/state/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -124,6 +124,7 @@ export default function Bookkeeping() {
   
   const [year, setYear] = useState<string>(currentYear);
   const [selectedMonth, setSelectedMonth] = useState<string>(currentMonth);
+  const [selectedBranchId, setSelectedBranchId] = useState<string>("all");
   
   const [checklistData, setChecklistData] = useState<Record<string, ChecklistEntry>>({});
   const [lockedMonths, setLockedMonths] = useState<string[]>([]);

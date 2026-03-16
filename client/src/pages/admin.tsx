@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth, Role } from "@/state/auth";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Trash2, AlertTriangle, Shield, Clock, Monitor, Info, Lock, Link as LinkIcon, Save, Palette } from "lucide-react";
+import { Trash2, AlertTriangle, Shield, Clock, Monitor, Info, Lock, Link as LinkIcon, Save, Palette, Edit } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
@@ -23,6 +23,14 @@ type Pharmacy = {
   name: string;
   openingHours: string;
   ipAllowlist: string[];
+  manager?: string;
+  address?: string;
+  color?: string;
+  users?: string[];
+  features?: {
+    retail?: boolean;
+    privateClinic?: boolean;
+  };
 };
 
 type SharePointConfig = {
@@ -52,11 +60,20 @@ export default function Admin() {
   // Trusted Browser Dialog
   const [viewingUserBrowsers, setViewingUserBrowsers] = useState<string | null>(null);
 
-  const [pharmacies] = useState<Pharmacy[]>([
-    { id: "bowland", name: "Bowland Pharmacy", openingHours: "Mon–Fri 09:00–18:00; Sat 09:00–13:00", ipAllowlist: ["81.100.10.0/24"] },
-    { id: "denton", name: "Denton Pharmacy", openingHours: "Mon–Fri 09:00–18:00", ipAllowlist: ["81.100.11.0/24"] },
-    { id: "wilmslow", name: "Wilmslow Pharmacy", openingHours: "Mon–Fri 09:00–18:00; Sat 10:00–14:00", ipAllowlist: ["81.100.12.0/24"] },
+  const [pharmacies, setPharmacies] = useState<Pharmacy[]>([
+    { id: "bowland", name: "Bowland Pharmacy", openingHours: "Mon–Fri 09:00–18:00; Sat 09:00–13:00", ipAllowlist: ["81.100.10.0/24"], manager: "John Smith", address: "1 High Street, Bowland", color: "#3b82f6", users: ["john@athealth.co.uk", "sarah@athealth.co.uk"], features: { retail: true, privateClinic: true } },
+    { id: "denton", name: "Denton Pharmacy", openingHours: "Mon–Fri 09:00–18:00", ipAllowlist: ["81.100.11.0/24"], manager: "Jane Doe", address: "2 Market Square, Denton", color: "#f97316", users: ["jane@athealth.co.uk"], features: { retail: true, privateClinic: false } },
+    { id: "wilmslow", name: "Wilmslow Pharmacy", openingHours: "Mon–Fri 09:00–18:00; Sat 10:00–14:00", ipAllowlist: ["81.100.12.0/24"], manager: "Mark Wilson", address: "10 Station Road, Wilmslow", color: "#a855f7", users: ["mark@athealth.co.uk"], features: { retail: true, privateClinic: true } },
   ]);
+
+  const [editingPharmacy, setEditingPharmacy] = useState<Pharmacy | null>(null);
+
+  const savePharmacy = () => {
+     if (!editingPharmacy) return;
+     setPharmacies(prev => prev.map(p => p.id === editingPharmacy.id ? editingPharmacy : p));
+     setEditingPharmacy(null);
+     toast({ title: "Pharmacy Updated", description: "Branch settings saved successfully." });
+  };
 
   // SharePoint Settings State
   const [sharePointConfig, setSharePointConfig] = useState<Record<string, SharePointConfig>>({
@@ -365,18 +382,27 @@ export default function Admin() {
                      </div>
 
                      {canDeleteBranch && (
-                        <Button 
-                           variant="ghost" 
-                           size="icon" 
-                           className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:bg-destructive/10"
-                           onClick={() => {
-                              setDeleteConfirmOpen({ type: 'pharmacy', id: p.id });
-                              setDeleteStep(0);
-                              setMasterPin("");
-                           }}
-                        >
-                           <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                           <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={() => setEditingPharmacy(p)}
+                           >
+                              <Edit className="h-4 w-4" />
+                           </Button>
+                           <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="text-destructive hover:bg-destructive/10"
+                              onClick={() => {
+                                 setDeleteConfirmOpen({ type: 'pharmacy', id: p.id });
+                                 setDeleteStep(0);
+                                 setMasterPin("");
+                              }}
+                           >
+                              <Trash2 className="h-4 w-4" />
+                           </Button>
+                        </div>
                      )}
                    </div>
                  ))}
@@ -680,7 +706,97 @@ export default function Admin() {
            </TabsContent>
         </Tabs>
 
-        {/* MASTER PIN DELETE DIALOG */}
+           <Dialog open={!!editingPharmacy} onOpenChange={(o) => !o && setEditingPharmacy(null)}>
+              <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+                 <DialogHeader>
+                    <DialogTitle>Edit Pharmacy Profile</DialogTitle>
+                    <DialogDescription>Update branch details and access controls.</DialogDescription>
+                 </DialogHeader>
+                 {editingPharmacy && (
+                    <div className="grid gap-4 py-4">
+                       <div className="grid grid-cols-2 gap-4">
+                          <div className="grid gap-2">
+                             <Label>Branch Name</Label>
+                             <Input 
+                                value={editingPharmacy.name} 
+                                onChange={e => setEditingPharmacy({...editingPharmacy, name: e.target.value})} 
+                             />
+                          </div>
+                          <div className="grid gap-2">
+                             <Label>Branch Color (Hex)</Label>
+                             <div className="flex gap-2">
+                                <div className="w-10 h-10 rounded-md border" style={{ backgroundColor: editingPharmacy.color || '#cccccc' }}></div>
+                                <Input 
+                                   value={editingPharmacy.color || ''} 
+                                   onChange={e => setEditingPharmacy({...editingPharmacy, color: e.target.value})} 
+                                />
+                             </div>
+                          </div>
+                       </div>
+                       <div className="grid grid-cols-2 gap-4">
+                          <div className="grid gap-2">
+                             <Label>Pharmacy Manager</Label>
+                             <Input 
+                                value={editingPharmacy.manager || ''} 
+                                onChange={e => setEditingPharmacy({...editingPharmacy, manager: e.target.value})} 
+                             />
+                          </div>
+                          <div className="grid gap-2">
+                             <Label>Opening Hours</Label>
+                             <Input 
+                                value={editingPharmacy.openingHours} 
+                                onChange={e => setEditingPharmacy({...editingPharmacy, openingHours: e.target.value})} 
+                             />
+                          </div>
+                       </div>
+                       <div className="grid gap-2">
+                          <Label>Address</Label>
+                          <Input 
+                             value={editingPharmacy.address || ''} 
+                             onChange={e => setEditingPharmacy({...editingPharmacy, address: e.target.value})} 
+                          />
+                       </div>
+                       <div className="grid gap-2">
+                          <Label>IP Allowlist (Comma separated)</Label>
+                          <Input 
+                             value={editingPharmacy.ipAllowlist.join(", ")} 
+                             onChange={e => setEditingPharmacy({...editingPharmacy, ipAllowlist: e.target.value.split(",").map(s => s.trim())})} 
+                          />
+                       </div>
+                       
+                       <div className="mt-4">
+                          <Label className="text-sm font-semibold mb-2 block">Enabled Features</Label>
+                          <div className="space-y-3 bg-muted/30 p-3 rounded-lg border">
+                             <div className="flex items-center justify-between">
+                                <Label className="font-normal">Private Clinic</Label>
+                                <Switch 
+                                   checked={editingPharmacy.features?.privateClinic} 
+                                   onCheckedChange={(c) => setEditingPharmacy({
+                                      ...editingPharmacy, 
+                                      features: { ...editingPharmacy.features, privateClinic: c }
+                                   })} 
+                                />
+                             </div>
+                             <div className="flex items-center justify-between">
+                                <Label className="font-normal">Retail / EPOS</Label>
+                                <Switch 
+                                   checked={editingPharmacy.features?.retail} 
+                                   onCheckedChange={(c) => setEditingPharmacy({
+                                      ...editingPharmacy, 
+                                      features: { ...editingPharmacy.features, retail: c }
+                                   })} 
+                                />
+                             </div>
+                          </div>
+                       </div>
+                    </div>
+                 )}
+                 <DialogFooter>
+                    <Button variant="ghost" onClick={() => setEditingPharmacy(null)}>Cancel</Button>
+                    <Button onClick={savePharmacy}>Save Changes</Button>
+                 </DialogFooter>
+              </DialogContent>
+           </Dialog>
         <Dialog open={!!deleteConfirmOpen} onOpenChange={(o) => !o && setDeleteConfirmOpen(null)}>
            <DialogContent className="sm:max-w-[425px]">
               <DialogHeader>

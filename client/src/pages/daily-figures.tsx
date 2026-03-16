@@ -7,9 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { CalendarIcon, FileText, CheckCircle2, AlertCircle, ArrowUpRight, ArrowDownRight, Edit2, Calendar, Lock } from "lucide-react";
+import { CheckCircle2, AlertCircle, ArrowUpRight, ArrowDownRight, Calendar, Lock } from "lucide-react";
+import { CalendarIcon } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format, isFuture } from "date-fns";
 import { useAuth } from "@/state/auth";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -72,6 +74,7 @@ export default function DailyFigures() {
   });
 
   const [date, setDate] = useState<Date | undefined>(new Date());
+  const [selectedBranchId, setSelectedBranchId] = useState<string>("all");
   
   const formattedDate = date ? format(date, "yyyy-MM-dd") : "";
   const existingRecord = submittedData[formattedDate];
@@ -312,35 +315,37 @@ export default function DailyFigures() {
         <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
           <div className="space-y-6">
             
-            {/* DATE SELECTOR & STATUS */}
-            <Card className={`p-4 flex items-center gap-4 border ${existingRecord ? (existingRecord.status === 'not_completed' ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200') : 'bg-primary/5 border-primary/20'}`}>
-               <div className={`h-10 w-10 rounded-full flex items-center justify-center shrink-0 ${existingRecord ? (existingRecord.status === 'not_completed' ? 'bg-amber-100 text-amber-600' : 'bg-emerald-100 text-emerald-600') : 'bg-primary/10 text-primary'}`}>
-                  {existingRecord ? <CheckCircle2 className="h-5 w-5" /> : <Calendar className="h-5 w-5" />}
-               </div>
-               <div className="flex-1">
-                  <div className="text-sm font-medium flex items-center gap-2">
-                     Trading Date
-                     {existingRecord ? (
-                        <Badge variant="outline" className={`h-5 text-[10px] ${existingRecord.status === 'not_completed' ? 'border-amber-500 text-amber-600' : 'border-emerald-500 text-emerald-600'}`}>
-                           {existingRecord.status === 'not_completed' ? 'Not Completed' : 'Entered'}
-                        </Badge>
-                     ) : (
-                        <Badge variant="outline" className="h-5 text-[10px] border-red-500 text-red-600">Not Entered</Badge>
-                     )}
-                  </div>
-                  <div className="text-xs text-muted-foreground mt-0.5">
-                     {existingRecord 
-                        ? `Last updated by ${existingRecord.user}` 
-                        : "Ensure this matches the day you are reporting for."}
-                  </div>
+         {/* DATE SELECTOR & STATUS */}
+            <Card className={`p-4 flex flex-col sm:flex-row sm:items-center gap-4 border ${existingRecord ? (existingRecord.status === 'not_completed' ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200') : 'bg-primary/5 border-primary/20'}`}>
+               <div className="flex items-center gap-4 flex-1">
+                 <div className={`h-10 w-10 rounded-full flex items-center justify-center shrink-0 ${existingRecord ? (existingRecord.status === 'not_completed' ? 'bg-amber-100 text-amber-600' : 'bg-emerald-100 text-emerald-600') : 'bg-primary/10 text-primary'}`}>
+                    {existingRecord ? <CheckCircle2 className="h-5 w-5" /> : <Calendar className="h-5 w-5" />}
+                 </div>
+                 <div>
+                    <div className="text-sm font-medium flex items-center gap-2">
+                       Trading Date
+                       {existingRecord ? (
+                          <Badge variant="outline" className={`h-5 text-[10px] ${existingRecord.status === 'not_completed' ? 'border-amber-500 text-amber-600' : 'border-emerald-500 text-emerald-600'}`}>
+                             {existingRecord.status === 'not_completed' ? 'Not Completed' : 'Entered'}
+                          </Badge>
+                       ) : (
+                          <Badge variant="outline" className="h-5 text-[10px] border-red-500 text-red-600">Not Entered</Badge>
+                       )}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                       {existingRecord 
+                          ? `Last updated by ${existingRecord.user}` 
+                          : "Ensure this matches the day you are reporting for."}
+                    </div>
+                 </div>
                </div>
                
-               <div className="flex items-center gap-2">
+               <div className="flex items-center gap-2 mt-2 sm:mt-0 w-full sm:w-auto">
                   <Popover>
                      <PopoverTrigger asChild>
                         <Button
                            variant="outline"
-                           className={`w-[180px] justify-start text-left font-normal bg-background ${!date && "text-muted-foreground"}`}
+                           className={`w-full sm:w-[180px] justify-start text-left font-normal bg-background ${!date && "text-muted-foreground"}`}
                         >
                            <CalendarIcon className="mr-2 h-4 w-4" />
                            {date ? format(date, "PPP") : <span>Pick a date</span>}

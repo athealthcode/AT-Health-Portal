@@ -40,6 +40,7 @@ type NavItem = {
   testId: string;
   requiresRole?: (role: string | undefined) => boolean;
   moduleKey?: keyof ReturnType<typeof useOrg>['modules'];
+  section?: string;
 };
 
 export function AppShell({ children }: PropsWithChildren) {
@@ -198,35 +199,54 @@ export function AppShell({ children }: PropsWithChildren) {
   );
 
   function NavLinks({ compact }: { compact?: boolean }) {
+    // Group navigation items by section
+    const groupedNav = visibleNav.reduce((acc, item) => {
+      const section = item.section || "Other";
+      if (!acc[section]) acc[section] = [];
+      acc[section].push(item);
+      return acc;
+    }, {} as Record<string, NavItem[]>);
+
+    const sectionOrder = ["Head Office", "Operations", "Banking", "Bonus", "Compliance", "Reports", "Documents", "Settings", "Other"];
+
     return (
-      <nav className={cn("grid gap-1", compact ? "" : "mt-3")}> 
-        {visibleNav.map((item) => {
-          const active = location === item.href;
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={() => setOpen(false)}
-              className={cn(
-                "group flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition font-medium",
-                "hover:bg-primary/10 hover:text-primary",
-                active ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground",
-              )}
-              data-testid={item.testId}
-            >
-              <Icon className={cn("h-4 w-4", active ? "opacity-100" : "opacity-70 group-hover:opacity-100")} />
-              <span>{item.label}</span>
-              {active && !compact ? (
-                <motion.span
-                  layoutId="nav-active"
-                  className="ml-auto h-2 w-2 rounded-full bg-white/20"
-                />
-              ) : null}
-            </Link>
-          );
+      <div className={cn("flex flex-col gap-4", compact ? "" : "mt-2")}> 
+        {sectionOrder.map(section => {
+           if (!groupedNav[section] || groupedNav[section].length === 0) return null;
+           
+           return (
+              <div key={section} className="space-y-1">
+                 {section !== "Other" && section !== "Head Office" && (
+                    <div className="px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+                       {section}
+                    </div>
+                 )}
+                 <nav className="grid gap-0.5">
+                    {groupedNav[section].map((item) => {
+                      const active = location === item.href;
+                      const Icon = item.icon;
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          onClick={() => setOpen(false)}
+                          className={cn(
+                            "group flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors font-medium",
+                            "hover:bg-primary/10 hover:text-primary",
+                            active ? "bg-primary/10 text-primary" : "text-muted-foreground",
+                          )}
+                          data-testid={item.testId}
+                        >
+                          <Icon className={cn("h-4 w-4", active ? "opacity-100" : "opacity-70 group-hover:opacity-100")} />
+                          <span>{item.label}</span>
+                        </Link>
+                      );
+                    })}
+                 </nav>
+              </div>
+           )
         })}
-      </nav>
+      </div>
     );
   }
 

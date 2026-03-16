@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { AlertCircle, Calendar, CheckCircle2, ArrowLeft, ArrowRight, Lock, Edit2, FileCheck, Landmark, CalendarIcon, Check } from "lucide-react";
+import { AlertCircle, Calendar, CheckCircle2, ArrowLeft, ArrowRight, Lock, Edit2, FileCheck, Landmark, Check, Building2 } from "lucide-react";
+import { CalendarIcon } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { format, isFuture } from "date-fns";
@@ -36,6 +37,7 @@ export default function CashingUp() {
   const { session } = useAuth();
 
   const [date, setDate] = useState<Date | undefined>(new Date());
+  const [selectedBranchId, setSelectedBranchId] = useState<string>("all");
   
   // Custom mock data for historical view
   const formattedDate = date ? format(date, "yyyy-MM-dd") : "";
