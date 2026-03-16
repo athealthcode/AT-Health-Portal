@@ -16,6 +16,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { useOrg } from "@/state/org";
+import { TemplateEngine } from "@/components/template-engine";
 
 type Pharmacy = {
   id: string;
@@ -160,11 +161,13 @@ export default function Admin() {
         </div>
         
         <Tabs defaultValue="users" className="w-full">
-           <TabsList className="flex w-full max-w-[600px] mb-4 flex-wrap">
+           <TabsList className="flex w-full max-w-[800px] mb-4 flex-wrap">
               <TabsTrigger value="users">Users</TabsTrigger>
               <TabsTrigger value="pharmacies">Pharmacies</TabsTrigger>
               <TabsTrigger value="documents">Documents</TabsTrigger>
               <TabsTrigger value="targets">Targets</TabsTrigger>
+              {isHeadOffice && <TabsTrigger value="templates">Templates & Workflows</TabsTrigger>}
+              {isHeadOffice && <TabsTrigger value="whitelabel">Organisation</TabsTrigger>}
               {isHeadOffice && <TabsTrigger value="launch-control">Launch Control</TabsTrigger>}
            </TabsList>
 
