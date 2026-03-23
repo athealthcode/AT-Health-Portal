@@ -19,7 +19,16 @@ export default function Pin() {
 
   const [pin, setPin] = useState("");
   const [isBusy, setIsBusy] = useState(false);
-  const [selectedStaff, setSelectedStaff] = useState<string | null>(null);
+  const [selectedStaff, setSelectedStaff] = useState<string | null>(() => {
+    if (session.userEmail?.toLowerCase() === "ahmed@at-health.co.uk") {
+      const ahmedStaff = availableStaff.find(s => s.role === "Super Admin");
+      if (ahmedStaff) {
+         selectStaff(ahmedStaff.id);
+         return ahmedStaff.id;
+      }
+    }
+    return null;
+  });
 
   const locked = !!(session.pinLockoutUntil && Date.now() < session.pinLockoutUntil);
   const secondsLeft = useMemo(() => {

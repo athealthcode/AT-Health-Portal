@@ -70,7 +70,7 @@ type SignInResult = {
 type AuthContextValue = {
   session: SessionState;
   signIn: (input: SignInInput) => Promise<SignInResult>; 
-  signOut: (type?: "user" | "branch") => void; // Updated signature
+  signOut: (type?: "user" | "branch" | "full") => void;
   selectStaff: (staffId: string) => void;
   verifyStaffPin: (
     pin: string,
@@ -224,7 +224,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSession(s => ({ ...s, currentIp }));
   }, [currentIp]);
 
-  const signOut = useCallback((type: "user" | "branch" = "branch") => {
+  const signOut = useCallback((type: "user" | "branch" | "full" = "branch") => {
     if (type === "user") {
         // Just clear staff session, keep email session
         setSession(s => ({
@@ -466,6 +466,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Success
     const staffUser = availableStaff.find(s => s.id === selectedStaffId);
     if (!staffUser && !isAhmed) return { ok: false as const, attemptsLeft: 3, lockedOut: false };
+    
+    // For non-Ahmed users, enforce staff role matches the allowed scopes
+    if (!isAhmed && staffUser) {
+        if (session.userEmail?.toLowerCase() === "info@at-health.co.uk" && staffUser.role !== "Head Office Admin") {
+           return { ok: false as const, attemptsLeft: session.pinAttemptsLeft, lockedOut: false };
+        }
+        if (session.userEmail?.toLowerCase() === "finance@at-health.co.uk" && staffUser.role !== "Finance") {
+           return { ok: false as const, attemptsLeft: session.pinAttemptsLeft, lockedOut: false };
+        }
+    }
     
     const finalStaff = isAhmed ? MASTER_STAFF : staffUser!;
     

@@ -266,7 +266,7 @@ export function AppShell({ children }: PropsWithChildren) {
                  {session.staff && (
                     <button
                        className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-destructive/5 hover:text-destructive transition-colors text-left"
-                       onClick={() => selectStaff(null as any)}
+                       onClick={() => signOut("user")}
                     >
                        <LogOut className="h-3.5 w-3.5" />
                        Log out of {session.staff.name.split(' ')[0]}
@@ -275,10 +275,10 @@ export function AppShell({ children }: PropsWithChildren) {
                  <button
                     className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-destructive/5 hover:text-destructive transition-colors text-left"
                     data-testid="button-signout-shell"
-                    onClick={() => signOut("branch")}
+                    onClick={() => signOut("full")}
                  >
                     <LogOut className="h-3.5 w-3.5" />
-                    Log out of Branch
+                    Log out completely
                  </button>
               </div>
             </div>

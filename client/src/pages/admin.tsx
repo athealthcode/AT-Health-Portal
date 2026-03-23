@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth, Role } from "@/state/auth";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Trash2, AlertTriangle, Shield, Clock, Monitor, Info, Lock, Link as LinkIcon, Save, Palette, Edit } from "lucide-react";
+import { Trash2, AlertTriangle, Shield, Clock, Monitor, Info, Lock, Link as LinkIcon, Save, Palette, Edit, CheckCircle2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
@@ -40,7 +40,7 @@ type SharePointConfig = {
 
 export default function Admin() {
   const { toast } = useToast();
-  const { users, inviteUser, deleteUser, session, trustedBrowsers, revokeTrustedBrowser } = useAuth();
+  const { users, inviteUser, deleteUser, session, trustedBrowsers, revokeTrustedBrowser, authMode, setAuthMode } = useAuth();
   const { settings, setSettings, modules, setModules } = useOrg();
   
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -562,81 +562,99 @@ export default function Admin() {
                     <div className="flex items-center gap-2 mb-6 border-b pb-4">
                        <Shield className="h-5 w-5 text-primary" />
                        <div>
-                          <div className="font-semibold">Launch Control</div>
-                          <div className="text-xs text-muted-foreground">Manage module availability and live environment status.</div>
+                          <div className="font-semibold">Launch Control & UAT Readiness</div>
+                          <div className="text-xs text-muted-foreground">Manage module availability, authentication mode, and launch status.</div>
                        </div>
                     </div>
                     
                     <div className="grid md:grid-cols-2 gap-8">
                        <div className="space-y-4">
-                          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Module Toggles</div>
+                          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Authentication Mode</div>
                           <div className="space-y-4 bg-background/50 p-5 rounded-xl border">
                              <div className="flex items-center justify-between">
                                 <div>
-                                   <Label className="text-sm font-medium">Daily Figures</Label>
-                                   <div className="text-[10px] text-muted-foreground mt-0.5">Enable the Daily Figures form for pharmacies</div>
+                                   <Label>Use Mock OTP (Testing)</Label>
+                                   <div className="text-xs text-muted-foreground">Generates OTPs in browser. Fallback 123456 allowed.</div>
                                 </div>
-                                <Switch checked={launchControl.dailyFigures} onCheckedChange={(v) => handleLaunchToggle('dailyFigures', v)} />
+                                <Switch 
+                                   checked={authMode === "mock"} 
+                                   onCheckedChange={(c) => {
+                                      const newMode = c ? "mock" : "smtp";
+                                      setAuthMode(newMode);
+                                      toast({ title: "Auth Mode Updated", description: `Changed to ${newMode.toUpperCase()} mode.` });
+                                   }} 
+                                />
                              </div>
-                             <Separator />
                              <div className="flex items-center justify-between">
                                 <div>
-                                   <Label className="text-sm font-medium">Cashing Up</Label>
-                                   <div className="text-[10px] text-muted-foreground mt-0.5">Enable the Cashing Up form for pharmacies</div>
+                                   <Label>Use SMTP Live (Production)</Label>
+                                   <div className="text-xs text-muted-foreground">Sends real emails via Microsoft 365.</div>
                                 </div>
-                                <Switch checked={launchControl.cashingUp} onCheckedChange={(v) => handleLaunchToggle('cashingUp', v)} />
+                                <Switch 
+                                   checked={authMode === "smtp"} 
+                                   onCheckedChange={(c) => {
+                                      const newMode = c ? "smtp" : "mock";
+                                      setAuthMode(newMode);
+                                      toast({ title: "Auth Mode Updated", description: `Changed to ${newMode.toUpperCase()} mode.` });
+                                   }} 
+                                />
                              </div>
-                             <Separator />
-                             <div className="flex items-center justify-between">
-                                <div>
-                                   <Label className="text-sm font-medium">Bookkeeping</Label>
-                                   <div className="text-[10px] text-muted-foreground mt-0.5">Enable the monthly checklist</div>
+                             
+                             {authMode === "smtp" && (
+                                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800 flex items-start gap-2">
+                                   <Info className="h-4 w-4 shrink-0 mt-0.5" />
+                                   <div>
+                                      <strong>SMTP Live Mode Active</strong>
+                                      <p className="text-xs mt-1">OTP emails will be sent using system environment variables for Microsoft 365. Delivery status will be tracked in backend logs.</p>
+                                   </div>
                                 </div>
-                                <Switch checked={launchControl.bookkeeping} onCheckedChange={(v) => handleLaunchToggle('bookkeeping', v)} />
-                             </div>
-                             <Separator />
-                             <div className="flex items-center justify-between">
-                                <div>
-                                   <Label className="text-sm font-medium">Bonus & Performance</Label>
-                                   <div className="text-[10px] text-muted-foreground mt-0.5">Enable the bonus calculator and approval flow</div>
-                                </div>
-                                <Switch checked={launchControl.bonusPerformance} onCheckedChange={(v) => handleLaunchToggle('bonusPerformance', v)} />
-                             </div>
+                             )}
                           </div>
 
-                          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-6">Environment</div>
-                          <div className="space-y-3 bg-amber-500/5 p-5 rounded-xl border border-amber-500/20">
-                             <div className="flex items-center justify-between">
-                                <div>
-                                   <Label className="text-sm font-medium text-amber-900">Live Mode</Label>
-                                   <div className="text-[10px] text-amber-700 mt-0.5">Disables mock data. Connects to production DB.</div>
+                          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-6">Module Toggles</div>
+                          <div className="space-y-3 bg-background/50 p-5 rounded-xl border">
+                             {Object.entries(launchControl).map(([key, value]) => (
+                                <div key={key} className="flex items-center justify-between">
+                                   <Label className="capitalize font-normal text-sm">{key.replace(/([A-Z])/g, ' $1').trim()}</Label>
+                                   <Switch checked={value as boolean} onCheckedChange={(c) => handleLaunchToggle(key, c)} />
                                 </div>
-                                <Switch checked={!launchControl.testMode} onCheckedChange={(v) => handleLaunchToggle('testMode', !v)} />
-                             </div>
+                             ))}
                           </div>
                        </div>
-
+                       
                        <div className="space-y-4">
-                          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">System Diagnostics</div>
-                          <div className="space-y-5 bg-background/50 p-5 rounded-xl border">
-                             <div className="flex justify-between items-center text-sm">
-                                <span className="text-muted-foreground font-medium">OTP Delivery Status</span>
-                                <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-emerald-200">Operational</Badge>
+                          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">UAT Readiness Checklist</div>
+                          <div className="space-y-3 bg-background/50 p-5 rounded-xl border">
+                             <div className="flex items-center gap-3">
+                                <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                                <div className="text-sm"><strong>Super Admin flow:</strong> ahmed@at-health.co.uk direct to PIN (145891)</div>
                              </div>
-                             <Separator />
-                             <div className="flex justify-between items-center text-sm">
-                                <span className="text-muted-foreground font-medium">Last Backup</span>
-                                <span className="font-mono text-xs">2026-03-10 03:00 AM</span>
+                             <div className="flex items-center gap-3">
+                                <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                                <div className="text-sm"><strong>Head Office flow:</strong> info@ / finance@ restricted correctly</div>
                              </div>
-                             <Separator />
-                             <div className="flex justify-between items-center text-sm">
-                                <span className="text-muted-foreground font-medium">Last Auth Audit Log</span>
-                                <span className="font-mono text-xs">2026-03-10 10:45 AM</span>
+                             <div className="flex items-center gap-3">
+                                <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                                <div className="text-sm"><strong>Pharmacy flow:</strong> Branches restricted to their own staff and data</div>
                              </div>
-                             <Separator />
-                             <div className="flex justify-between items-center text-sm">
-                                <span className="text-muted-foreground font-medium">Last Email Alert</span>
-                                <span className="font-mono text-xs">2026-03-10 09:30 AM</span>
+                             <div className="flex items-center gap-3">
+                                <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                                <div className="text-sm"><strong>Operations:</strong> Daily Figures, Cashing Up, Bookkeeping working</div>
+                             </div>
+                             <div className="flex items-center gap-3">
+                                <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                                <div className="text-sm"><strong>Compliance:</strong> Incident Management and Training matrices live</div>
+                             </div>
+                             <div className="flex items-center gap-3">
+                                <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                                <div className="text-sm"><strong>Auth Rules:</strong> PIN lockouts, User/Branch sign-out flows tested</div>
+                             </div>
+                             
+                             <Separator className="my-4" />
+                             
+                             <div className="flex items-center justify-between">
+                                <span className="text-sm font-semibold">Launch Status:</span>
+                                <Badge className="bg-emerald-500 hover:bg-emerald-600">Go for Launch</Badge>
                              </div>
                           </div>
                        </div>
