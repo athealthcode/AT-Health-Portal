@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
+import { useDailyFigures } from "@/hooks/use-daily-figures";
 import { CheckCircle2, AlertCircle, ArrowUpRight, ArrowDownRight, Calendar, Lock } from "lucide-react";
 import { CalendarIcon } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -28,8 +29,8 @@ const PRESCRIPTION_FIELDS = [
 
 const OTHER_FIELDS: ServiceField[] = [
   { key: "ssp", label: "SSP", group: "Figures" },
-  { key: "nhs_prepayment", label: "NHS Prepayment (£)", group: "Figures", isCurrency: true },
-  { key: "fp57_refund", label: "FP57 Refund (£)", group: "Figures", isCurrency: true },
+  { key: "nhs_prepayment", label: "NHS Prepayment (Â£)", group: "Figures", isCurrency: true },
+  { key: "fp57_refund", label: "FP57 Refund (Â£)", group: "Figures", isCurrency: true },
   { key: "nms_intervention", label: "NMS Intervention", group: "NMS" },
   { key: "nms_follow_up", label: "NMS Follow-up", group: "NMS" },
   { key: "dms_stage_1", label: "Stage 1", group: "DMS" },
@@ -64,19 +65,21 @@ export default function DailyFigures() {
   const { toast } = useToast();
   const { session } = useAuth();
   
-  // Custom mock data hook for historical view
-  const [submittedData, setSubmittedData] = useState<Record<string, any>>({
-     "2026-03-01": { 
-        user: "John Smith", 
-        timestamp: new Date().getTime() - 86400000, 
-        values: { eps_rx_paid: 120, eps_rx_exempt: 340, paper_rx_paid: 10, paper_rx_exempt: 15, eps_items_paid: 150, eps_items_exempt: 500, paper_items_paid: 12, paper_items_exempt: 20, nhs_prepayment: "32.05" }
-     }
-  });
+  const [submittedData, setSubmittedData] = useState<Record<string, any>>({});
 
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [selectedBranchId, setSelectedBranchId] = useState<string>("all");
   
   const formattedDate = date ? format(date, "yyyy-MM-dd") : "";
+  const { record, loading, saveActual, saveGap } = useDailyFigures(formattedDate || null);
+
+  // Sync API record into local state
+  useEffect(() => {
+    if (record && formattedDate) {
+      setSubmittedData(prev => ({ ...prev, [formattedDate]: { values: record } }));
+    }
+  }, [record, formattedDate]);
+
   const existingRecord = submittedData[formattedDate];
   
   // Is this Head Office/Ahmed who can edit any day?
@@ -200,18 +203,18 @@ export default function DailyFigures() {
         const isM3 = Math.abs(val % m3) < 0.01;
         
         if (!isM1 && !isM2 && !isM3) {
-           errors[key] = `Must be a multiple of £32.05, £114.50, or £19.80`;
+           errors[key] = `Must be a multiple of Â£32.05, Â£114.50, or Â£19.80`;
         }
      };
 
      validatePrepMult("nhs_prepayment");
 
-     // FP57 is typically multiples of £9.90
+     // FP57 is typically multiples of Â£9.90
      if (values["fp57_refund"] !== "" && values["fp57_refund"] !== "0" && values["fp57_refund"] !== "0.00") {
         const fp57 = Number(values["fp57_refund"]);
         const ratio = fp57 / 9.90;
         if (Math.abs(ratio - Math.round(ratio)) > 0.001) {
-           errors["fp57_refund"] = "Must be a multiple of £9.90";
+           errors["fp57_refund"] = "Must be a multiple of Â£9.90";
         }
      }
 
@@ -246,6 +249,8 @@ export default function DailyFigures() {
         }
      }));
 
+     saveActual({ ...values }).catch(console.error);
+
      setIsEditingMode(false);
      toast({ title: "Figures Submitted", description: `Daily figures for ${format(date!, "PPP")} have been saved.` });
   };
@@ -267,6 +272,7 @@ export default function DailyFigures() {
         }
      }));
      
+     saveGap(notCompletedReason).catch(console.error);
      setNotCompletedOpen(false);
      setIsEditingMode(false);
      toast({ title: "Status Updated", description: "Marked as not completed." });
@@ -482,11 +488,11 @@ export default function DailyFigures() {
                            <div className="grid grid-cols-2 gap-4 mt-4">
                               <div className="bg-background/50 rounded-xl border p-3">
                                  <div className="text-xs text-muted-foreground mb-1">NHS Prepayment</div>
-                                 <div className="font-mono font-medium text-lg">£{Number(values["nhs_prepayment"] || 0).toFixed(2)}</div>
+                                 <div className="font-mono font-medium text-lg">Â£{Number(values["nhs_prepayment"] || 0).toFixed(2)}</div>
                               </div>
                               <div className="bg-background/50 rounded-xl border p-3">
                                  <div className="text-xs text-muted-foreground mb-1">FP57 Refund</div>
-                                 <div className="font-mono font-medium text-lg">£{Number(values["fp57_refund"] || 0).toFixed(2)}</div>
+                                 <div className="font-mono font-medium text-lg">Â£{Number(values["fp57_refund"] || 0).toFixed(2)}</div>
                               </div>
                            </div>
                         </div>
@@ -650,7 +656,7 @@ export default function DailyFigures() {
                               {f.label}
                             </Label>
                             <div className="relative">
-                               {f.isCurrency && <span className="absolute left-3 top-2.5 text-xs text-muted-foreground">£</span>}
+                               {f.isCurrency && <span className="absolute left-3 top-2.5 text-xs text-muted-foreground">Â£</span>}
                                <Input
                                  className={`font-mono h-10 ${f.isCurrency ? "pl-6" : ""} ${validationErrors[f.key] ? "border-destructive ring-destructive/20 focus-visible:ring-destructive/20" : ""}`}
                                  value={values[f.key]}
@@ -684,8 +690,8 @@ export default function DailyFigures() {
                 <div className="text-sm font-semibold mb-4">Form Guide</div>
                 <div className="space-y-4 text-xs text-muted-foreground">
                    <p><strong>0 Required:</strong> If no activity occurred for a specific metric, you must explicitly enter <code>0</code>.</p>
-                   <p><strong>NHS Prepayments:</strong> Ensure this matches the exact certificate cost (£32.05, £114.50, or £19.80). Validations enforce exact multiples.</p>
-                   <p><strong>FP57:</strong> Must be a multiple of £9.90.</p>
+                   <p><strong>NHS Prepayments:</strong> Ensure this matches the exact certificate cost (Â£32.05, Â£114.50, or Â£19.80). Validations enforce exact multiples.</p>
+                   <p><strong>FP57:</strong> Must be a multiple of Â£9.90.</p>
                    <Separator />
                    <p className="font-medium text-foreground">Need help?</p>
                    <p>Contact Head Office or raise an IT ticket if forms fail to submit.</p>
