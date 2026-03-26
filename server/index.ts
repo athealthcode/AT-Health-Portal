@@ -1,37 +1,11 @@
 import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
-import { serveStatic } from "./static";
 import { createServer } from "http";
+import { registerRoutes } from "./routes";
+import { log } from "./vite";
 
 const app = express();
-const httpServer = createServer(app);
-
-declare module "http" {
-  interface IncomingMessage {
-    rawBody: unknown;
-  }
-}
-
-app.use(
-  express.json({
-    verify: (req, _res, buf) => {
-      req.rawBody = buf;
-    },
-  }),
-);
-
+app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-
-export function log(message: string, source = "express") {
-  const formattedTime = new Date().toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: true,
-  });
-
-  console.log(`${formattedTime} [${source}] ${message}`);
-}
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -51,7 +25,9 @@ app.use((req, res, next) => {
       if (capturedJsonResponse) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
-
+      if (logLine.length > 80) {
+        logLine = logLine.slice(0, 79) + "…";
+      }
       log(logLine);
     }
   });
@@ -59,52 +35,60 @@ app.use((req, res, next) => {
   next();
 });
 
-const _ready = (async () => {
-  await registerRoutes(httpServer, app);
+const httpServer = createServer(app);
 
-  app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+// Lazy initialization — no module-level async, safe for Vercel cold starts
+let _initPromise: Promise<void> | null = null;
 
-    console.error("Internal Server Error:", err);
+function ensureInitialized(): Promise<void> {
+  if (!_initPromise) {
+    _initPromise = (async () => {
+      await registerRoutes(httpServer, app);
 
-    if (res.headersSent) {
-      return next(err);
-    }
+      app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
+        const status = err.status || err.statusCode || 500;
+        const message = err.message || "Internal Server Error";
+        console.error("Internal Server Error:", err);
+        if (res.headersSent) { return next(err); }
+        return res.status(status).json({ message });
+      });
 
-    return res.status(status).json({ message });
-  });
-
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  // On Vercel, routing is handled by vercel.json rewrites Ã¢ÂÂ skip local static serving
-  if (process.env.NODE_ENV === "production" && !process.env.VERCEL) {
-    serveStatic(app);
-  } else if (process.env.NODE_ENV !== "production") {
-    const { setupVite } = await import("./vite");
-    await setupVite(httpServer, app);
+      if (!process.env.VERCEL) {
+        if (process.env.NODE_ENV === "production") {
+          const { serveStatic } = await import("./static");
+          serveStatic(app);
+        } else {
+          const { setupVite } = await import("./vite");
+          await setupVite(httpServer, app);
+        }
+        const port = parseInt(process.env.PORT || "5000", 10);
+        httpServer.listen({ port, host: "0.0.0.0", reusePort: true }, () => {
+          log(`serving on port ${port}`);
+        });
+      }
+    })();
   }
-
-  // Only start listening when not running on Vercel
-  if (!process.env.VERCEL) {
-    const port = parseInt(process.env.PORT || "5000", 10);
-    httpServer.listen(
-      {
-        port,
-        host: "0.0.0.0",
-        reusePort: true,
-      },
-      () => {
-        log(`serving on port ${port}`);
-      },
-    );
-  }
-})();
-_ready.catch(err => console.error('[startup error]', err?.message, err?.stack));
+  return _initPromise;
+}
 
 // Vercel serverless handler
 export default async function handler(req: any, res: any) {
-  await _ready;
+  try {
+    await ensureInitialized();
+  } catch (err: any) {
+    console.error("[handler] init failed:", err?.message, err?.stack);
+    if (!res.headersSent) {
+      res.status(500).json({ phase: "init", error: String(err), stack: err?.stack });
+    }
+    return;
+  }
   return app(req, res);
+}
+
+// For local development, start the server eagerly
+if (!process.env.VERCEL) {
+  ensureInitialized().catch((err) => {
+    console.error("Fatal server error:", err);
+    process.exit(1);
+  });
 }
