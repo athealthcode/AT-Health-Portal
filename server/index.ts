@@ -1,7 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { createServer } from "http";
 import { registerRoutes } from "./routes";
-import { log } from "./vite";
 
 const app = express();
 app.use(express.json());
@@ -28,7 +27,7 @@ app.use((req, res, next) => {
       if (logLine.length > 80) {
         logLine = logLine.slice(0, 79) + "…";
       }
-      log(logLine);
+      console.log(logLine);
     }
   });
 
@@ -44,15 +43,14 @@ function ensureInitialized(): Promise<void> {
   if (!_initPromise) {
     _initPromise = (async () => {
       await registerRoutes(httpServer, app);
-
-      app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
+      app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
         const status = err.status || err.statusCode || 500;
         const message = err.message || "Internal Server Error";
-        console.error("Internal Server Error:", err);
-        if (res.headersSent) { return next(err); }
-        return res.status(status).json({ message });
+        if (!res.headersSent) {
+          res.status(status).json({ message });
+        }
+        console.error("[error]", err);
       });
-
       if (!process.env.VERCEL) {
         if (process.env.NODE_ENV === "production") {
           const { serveStatic } = await import("./static");
@@ -63,7 +61,7 @@ function ensureInitialized(): Promise<void> {
         }
         const port = parseInt(process.env.PORT || "5000", 10);
         httpServer.listen({ port, host: "0.0.0.0", reusePort: true }, () => {
-          log(`serving on port ${port}`);
+          console.log(`serving on port ${port}`);
         });
       }
     })();
@@ -71,7 +69,6 @@ function ensureInitialized(): Promise<void> {
   return _initPromise;
 }
 
-// Vercel serverless handler
 export default async function handler(req: any, res: any) {
   try {
     await ensureInitialized();
@@ -85,7 +82,6 @@ export default async function handler(req: any, res: any) {
   return app(req, res);
 }
 
-// For local development, start the server eagerly
 if (!process.env.VERCEL) {
   ensureInitialized().catch((err) => {
     console.error("Fatal server error:", err);
