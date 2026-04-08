@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,22 +8,25 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useAuth } from "@/state/auth";
 import { FileSearch, CheckCircle2, AlertTriangle, ArrowRight, Wallet, Download } from "lucide-react";
 
-const MOCK_RECONCILIATION = [
-  { date: "2026-03-01", expected: 1200.50, actual: 1200.50, diff: 0, status: "matched", notes: "Barclays High St" },
-  { date: "2026-03-02", expected: 850.00, actual: 850.00, diff: 0, status: "matched", notes: "Barclays High St" },
-  { date: "2026-03-03", expected: 1420.25, actual: 1400.00, diff: -20.25, status: "unreconciled", notes: "Pending resolution" },
-  { date: "2026-03-04", expected: 910.00, actual: 910.00, diff: 0, status: "matched", notes: "Natwest" },
-  { date: "2026-03-05", expected: 1100.00, actual: 0, diff: -1100.00, status: "missing", notes: "Not banked yet" },
-];
+
 
 export default function BankingReconciliation() {
   const { session } = useAuth();
+  const [reconciliations, setReconciliations] = useState<any[]>([]);
+  useEffect(() => {
+    const phId = session?.scope?.pharmacyId;
+    const qp = phId ? `?pharmacy_id=${phId}` : "";
+    fetch(`/api/banking-reconciliation${qp}`)
+      .then(r => r.json())
+      .then(d => { if (Array.isArray(d)) setReconciliations(d); })
+      .catch(() => {});
+  }, [session?.scope?.pharmacyId]);
   const isHeadOffice = session.scope.type === "headoffice";
   const [pharmacy, setPharmacy] = useState<string>(isHeadOffice ? "bowland" : session.scope.type === "pharmacy" ? session.scope.pharmacyId : "bowland");
   const [month, setMonth] = useState("2026-03");
 
-  const totalExpected = MOCK_RECONCILIATION.reduce((acc, row) => acc + row.expected, 0);
-  const totalActual = MOCK_RECONCILIATION.reduce((acc, row) => acc + row.actual, 0);
+  const totalExpected = reconciliations.reduce((acc, row) => acc + row.expected, 0);
+  const totalActual = reconciliations.reduce((acc, row) => acc + row.actual, 0);
   const totalDiff = totalActual - totalExpected;
 
   return (
@@ -105,7 +108,7 @@ export default function BankingReconciliation() {
                  </TableRow>
               </TableHeader>
               <TableBody>
-                 {MOCK_RECONCILIATION.map((row, i) => (
+                 {reconciliations.map((row, i) => (
                     <TableRow key={i}>
                        <TableCell className="font-mono text-sm">{row.date}</TableCell>
                        <TableCell className="font-mono">£{row.expected.toFixed(2)}</TableCell>
