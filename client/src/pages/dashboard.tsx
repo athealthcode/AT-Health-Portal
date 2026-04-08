@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -38,13 +38,32 @@ export default function Dashboard() {
     { id: 2, title: "Complete Cashing Up", due: "Today, 6:30 PM", urgency: "medium", href: "/cashing-up" },
   ]);
 
-  const globalMetrics = {
-    items: { value: "24,812", pct: "+4.2%", num: "+1,005", up: true },
-    nms: { value: "142", pct: "+9.2%", num: "+12", up: true },
-    pharmacyFirst: { value: "89", pct: "+5.9%", num: "+5", up: true },
-    nominations: { value: "12,450", weeklyPct: "+1.2%", weeklyNum: "+128", up: true }
-  };
-  
+  const [globalMetrics, setGlobalMetrics] = useState({
+    items:         { value: "0", pct: "", num: "", up: false },
+    nms:           { value: "0", pct: "", num: "", up: false },
+    pharmacyFirst: { value: "0", pct: "", num: "", up: false },
+    nominations:   { value: "0", weeklyPct: "", weeklyNum: "", up: false },
+  });
+  useEffect(() => {
+    const phId = session.scope?.pharmacyId;
+    const qp = phId ? `?pharmacy_id=${phId}` : "";
+    fetch(`/api/cashing-up${qp}`)
+      .then(r => r.json())
+      .then(data => {
+        if (!Array.isArray(data)) return;
+        const tot = (field: string) => data.reduce((s: number, r: any) => s + (Number(r[field]) || 0), 0);
+        const items = tot("items_dispensed") || tot("items");
+        const nms   = tot("nms");
+        const pf    = tot("pharmacy_first");
+        setGlobalMetrics(prev => ({
+          ...prev,
+          items:         { ...prev.items,         value: items.toLocaleString() },
+          nms:           { ...prev.nms,           value: String(nms) },
+          pharmacyFirst: { ...prev.pharmacyFirst, value: String(pf) },
+        }));
+      })
+      .catch(() => {});
+  }, [session.scope?.pharmacyId]);
   const myPharmacyMetrics = {
      items: { value: "9,120", pct: "+2.1%", num: "+187", up: true },
      nms: { value: "62", pct: "+14.8%", num: "+8", up: true },
