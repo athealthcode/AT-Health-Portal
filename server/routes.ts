@@ -499,7 +499,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.get("/api/staff", async (req, res) => {
     try {
       const { pharmacy_id } = req.query as Record<string, string>;
-      const qs = pharmacy_id ? `select=*&pharmacy_id=eq.${pharmacy_id}&order=full_name.asc` : `select=*&order=full_name.asc`;
+      const qs = pharmacy_id ? `select=*&pharmacy_id=eq.${pharmacy_id}&order=name.asc` : `select=*&order=name.asc`;
       const data: any[] = await sbGetRaw(`/staff_members?${qs}`);
       return res.json(data);
     } catch (e: any) { return res.status(500).json({ error: e.message }); }
