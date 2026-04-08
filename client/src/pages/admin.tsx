@@ -41,6 +41,10 @@ type SharePointConfig = {
 export default function Admin() {
   const { toast } = useToast();
   const { users, inviteUser, deleteUser, session, trustedBrowsers, revokeTrustedBrowser, authMode, setAuthMode } = useAuth();
+  const [staffList, setStaffList] = useState<any[]>([]);
+  useEffect(() => {
+    fetch('/api/staff').then(r => r.json()).then(d => { if (Array.isArray(d)) setStaffList(d); }).catch(() => {});
+  }, []);
   const { settings, setSettings, modules, setModules } = useOrg();
   
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -275,12 +279,12 @@ export default function Admin() {
                      </TableRow>
                    </TableHeader>
                    <TableBody>
-                     {users.map((u) => (
+                     {staffList.map((u) => (
                        <TableRow key={u.id} data-testid={`row-user-${u.id}`}>
-                         <TableCell data-testid={`text-user-email-${u.id}`}>{u.email}</TableCell>
+                         <TableCell data-testid={`text-user-email-${u.id}`}>{u.email || u.name}</TableCell>
                          <TableCell data-testid={`text-user-role-${u.id}`}>{u.role}</TableCell>
                          <TableCell data-testid={`text-user-scope-${u.id}`}>
-                           {u.scope.type === "pharmacy" ? u.scope.pharmacyName : "Head Office"}
+                           {u.pharmacy_id ? (u.pharmacy_name || u.pharmacy_id) : "Head Office"}
                          </TableCell>
                          <TableCell className="text-right">
                            <div className="flex justify-end gap-1">
