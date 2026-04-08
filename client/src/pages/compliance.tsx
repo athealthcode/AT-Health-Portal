@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,38 +20,29 @@ import {
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 
-const MOCK_DATA = {
-  score: 88,
-  previousScore: 82,
-  metrics: {
-    dailyFigures: 94,
-    cashingUp: 89,
-    bookkeeping: 100,
-    missing: 3,
-    late: 5,
-    notCompleted: 2,
-    exceptions: 1,
-  },
-  leagueTable: [
-    { name: "Bowland Pharmacy", score: 96, trend: "+4" },
-    { name: "Denton Pharmacy", score: 88, trend: "+6" },
-    { name: "Wilmslow Pharmacy", score: 80, trend: "-2" },
-  ],
-  missedDates: [
-    { date: "10 Mar 2026", pharmacy: "Wilmslow Pharmacy", type: "Daily Figures", reason: "Pending", status: "Missing" },
-    { date: "09 Mar 2026", pharmacy: "Denton Pharmacy", type: "Cashing Up", reason: "Till issue", status: "Late" },
-    { date: "05 Mar 2026", pharmacy: "Bowland Pharmacy", type: "Daily Figures", reason: "Bank Holiday", status: "Not Completed" },
-  ]
-};
+
 
 export default function Compliance() {
   const { session } = useAuth();
+  const [complianceItems, setComplianceItems] = useState<any>({
+    score: 0, previousScore: 0,
+    metrics: { dailyFigures: 0, cashingUp: 0, bookkeeping: 0, missing: 0, late: 0, notCompleted: 0, exceptions: 0 },
+    leagueTable: []
+  });
+  useEffect(() => {
+    const phId = session?.scope?.pharmacyId;
+    const qp = phId ? `?pharmacy_id=${phId}` : "";
+    fetch(`/api/compliance${qp}`)
+      .then(r => r.json())
+      .then(d => { if (Array.isArray(d) && d.length) setComplianceItems(d[0]); })
+      .catch(() => {});
+  }, [session?.scope?.pharmacyId]);
   const isHeadOffice = session.scope.type === "headoffice";
   const [month, setMonth] = useState("March 2026");
 
-  const scoreColor = MOCK_DATA.score >= 90 ? "text-emerald-600" : MOCK_DATA.score >= 80 ? "text-amber-500" : "text-red-500";
-  const scoreBg = MOCK_DATA.score >= 90 ? "bg-emerald-50 border-emerald-200" : MOCK_DATA.score >= 80 ? "bg-amber-50 border-amber-200" : "bg-red-50 border-red-200";
-  const trendUp = MOCK_DATA.score >= MOCK_DATA.previousScore;
+  const scoreColor = complianceItems.score >= 90 ? "text-emerald-600" : complianceItems.score >= 80 ? "text-amber-500" : "text-red-500";
+  const scoreBg = complianceItems.score >= 90 ? "bg-emerald-50 border-emerald-200" : complianceItems.score >= 80 ? "bg-amber-50 border-amber-200" : "bg-red-50 border-red-200";
+  const trendUp = complianceItems.score >= complianceItems.previousScore;
 
   return (
     <AppShell>
@@ -82,12 +73,12 @@ export default function Compliance() {
           <Card className={`p-6 rounded-2xl border ${scoreBg} shadow-sm md:col-span-1 flex flex-col justify-center items-center text-center`}>
             <div className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-4">Overall Compliance Score</div>
             <div className={`text-6xl font-bold font-mono ${scoreColor}`}>
-               {MOCK_DATA.score}
+               {complianceItems.score}
                <span className="text-2xl text-muted-foreground opacity-50">/100</span>
             </div>
             <div className={`flex items-center gap-1 mt-4 font-medium text-sm ${trendUp ? "text-emerald-600" : "text-red-500"}`}>
                {trendUp ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
-               {Math.abs(MOCK_DATA.score - MOCK_DATA.previousScore)} points vs last month
+               {Math.abs(complianceItems.score - complianceItems.previousScore)} points vs last month
             </div>
           </Card>
 
@@ -97,23 +88,23 @@ export default function Compliance() {
                <div>
                   <div className="flex justify-between text-sm mb-1.5">
                      <span className="font-medium text-muted-foreground">Daily Figures On-Time Rate</span>
-                     <span className="font-mono font-medium">{MOCK_DATA.metrics.dailyFigures}%</span>
+                     <span className="font-mono font-medium">{complianceItems.metrics.dailyFigures}%</span>
                   </div>
-                  <Progress value={MOCK_DATA.metrics.dailyFigures} className="h-2" />
+                  <Progress value={complianceItems.metrics.dailyFigures} className="h-2" />
                </div>
                <div>
                   <div className="flex justify-between text-sm mb-1.5">
                      <span className="font-medium text-muted-foreground">Cashing Up On-Time Rate</span>
-                     <span className="font-mono font-medium">{MOCK_DATA.metrics.cashingUp}%</span>
+                     <span className="font-mono font-medium">{complianceItems.metrics.cashingUp}%</span>
                   </div>
-                  <Progress value={MOCK_DATA.metrics.cashingUp} className="h-2" />
+                  <Progress value={complianceItems.metrics.cashingUp} className="h-2" />
                </div>
                <div>
                   <div className="flex justify-between text-sm mb-1.5">
                      <span className="font-medium text-muted-foreground">Bookkeeping Completion</span>
-                     <span className="font-mono font-medium">{MOCK_DATA.metrics.bookkeeping}%</span>
+                     <span className="font-mono font-medium">{complianceItems.metrics.bookkeeping}%</span>
                   </div>
-                  <Progress value={MOCK_DATA.metrics.bookkeeping} className="h-2" />
+                  <Progress value={complianceItems.metrics.bookkeeping} className="h-2" />
                </div>
             </div>
           </Card>
@@ -123,19 +114,19 @@ export default function Compliance() {
           <div className="space-y-6">
              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <Card className="p-4 border bg-card/60 shadow-sm text-center">
-                   <div className="text-3xl font-mono font-bold text-red-500">{MOCK_DATA.metrics.missing}</div>
+                   <div className="text-3xl font-mono font-bold text-red-500">{complianceItems.metrics.missing}</div>
                    <div className="text-xs font-medium text-muted-foreground uppercase mt-1">Missing<br/>Submissions</div>
                 </Card>
                 <Card className="p-4 border bg-card/60 shadow-sm text-center">
-                   <div className="text-3xl font-mono font-bold text-amber-500">{MOCK_DATA.metrics.late}</div>
+                   <div className="text-3xl font-mono font-bold text-amber-500">{complianceItems.metrics.late}</div>
                    <div className="text-xs font-medium text-muted-foreground uppercase mt-1">Late<br/>Submissions</div>
                 </Card>
                 <Card className="p-4 border bg-card/60 shadow-sm text-center">
-                   <div className="text-3xl font-mono font-bold text-blue-500">{MOCK_DATA.metrics.notCompleted}</div>
+                   <div className="text-3xl font-mono font-bold text-blue-500">{complianceItems.metrics.notCompleted}</div>
                    <div className="text-xs font-medium text-muted-foreground uppercase mt-1">Marked Not<br/>Completed</div>
                 </Card>
                 <Card className="p-4 border bg-card/60 shadow-sm text-center">
-                   <div className="text-3xl font-mono font-bold text-purple-500">{MOCK_DATA.metrics.exceptions}</div>
+                   <div className="text-3xl font-mono font-bold text-purple-500">{complianceItems.metrics.exceptions}</div>
                    <div className="text-xs font-medium text-muted-foreground uppercase mt-1">Authorised<br/>Exceptions</div>
                 </Card>
              </div>
@@ -159,7 +150,7 @@ export default function Compliance() {
                          </tr>
                       </thead>
                       <tbody className="divide-y">
-                         {MOCK_DATA.missedDates.filter(d => isHeadOffice || (session.scope.type === "pharmacy" && d.pharmacy === session.scope.pharmacyName)).map((row, i) => (
+                         {complianceItems.missedDates.filter(d => isHeadOffice || (session.scope.type === "pharmacy" && d.pharmacy === session.scope.pharmacyName)).map((row, i) => (
                             <tr key={i} className="hover:bg-muted/30 transition-colors">
                                <td className="p-3 font-medium">{row.date}</td>
                                {isHeadOffice && <td className="p-3">{row.pharmacy}</td>}
@@ -188,7 +179,7 @@ export default function Compliance() {
                    <h3 className="font-semibold flex items-center gap-2"><BarChart3 className="h-4 w-4 text-primary" /> League Table</h3>
                 </div>
                 <div className="space-y-4">
-                   {MOCK_DATA.leagueTable.map((pharma, idx) => (
+                   {complianceItems.leagueTable.map((pharma, idx) => (
                       <div key={idx} className="flex items-center justify-between">
                          <div className="flex items-center gap-3">
                             <div className="text-xs font-mono font-bold text-muted-foreground w-4">{idx + 1}</div>
