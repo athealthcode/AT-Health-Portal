@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,26 +20,24 @@ type Exception = {
   link: string;
 };
 
-const MOCK_EXCEPTIONS: Exception[] = [
-  { id: "e1", date: "2026-03-10", pharmacyId: "bowland", pharmacyName: "Bowland Pharmacy", type: "Daily Figures Missing", description: "Daily Figures not entered for today.", severity: "high", link: "/daily-figures" },
-  { id: "e2", date: "2026-03-10", pharmacyId: "denton", pharmacyName: "Denton Pharmacy", type: "Cashing Up Missing", description: "Cashing Up not entered for today.", severity: "high", link: "/cashing-up" },
-  { id: "e3", date: "2026-03-09", pharmacyId: "wilmslow", pharmacyName: "Wilmslow Pharmacy", type: "Missing Invoice", description: "Banking entry missing locum invoice confirmation.", severity: "medium", link: "/banking-reconciliation" },
-  { id: "e4", date: "2026-03-01", pharmacyId: "bowland", pharmacyName: "Bowland Pharmacy", type: "Not Completed", description: "Manager marked Daily Figures as Not Completed.", severity: "low", link: "/daily-figures" },
-  { id: "e5", date: "2026-03-05", pharmacyId: "denton", pharmacyName: "Denton Pharmacy", type: "Bookkeeping Incomplete", description: "Mandatory MYS items missing for current month.", severity: "medium", link: "/bookkeeping" },
-  { id: "e6", date: "2026-02-28", pharmacyId: "wilmslow", pharmacyName: "Wilmslow Pharmacy", type: "Bonus Unapproved", description: "Bonus month (Feb) is locked but unapproved.", severity: "medium", link: "/bonus-performance" },
-  { id: "e7", date: "2026-03-08", pharmacyId: "bowland", pharmacyName: "Bowland Pharmacy", type: "PQS Overdue", description: "Asthma domain criteria overdue for submission.", severity: "high", link: "/pqs" },
-  { id: "e8", date: "2026-03-07", pharmacyId: "denton", pharmacyName: "Denton Pharmacy", type: "Unresolved Incident", description: "Fridge Temp Excursion open for > 48 hours.", severity: "high", link: "/incidents" },
-  { id: "e9", date: "2026-03-06", pharmacyId: "wilmslow", pharmacyName: "Wilmslow Pharmacy", type: "SOP Compliance", description: "3 Staff members overdue on Information Governance SOP.", severity: "medium", link: "/documents" },
-  { id: "e10", date: "2026-03-09", pharmacyId: "bowland", pharmacyName: "Bowland Pharmacy", type: "Stock Transfer", description: "Excess stock of Apixaban awaiting transfer action.", severity: "low", link: "/stock-transfer" }
-];
+
 
 export default function Exceptions() {
   const { session } = useAuth();
+  const [exceptionsList, setExceptionsList] = useState<any[]>([]);
+  useEffect(() => {
+    const phId = session?.scope?.pharmacyId;
+    const qp = phId ? `?pharmacy_id=${phId}` : "";
+    fetch(`/api/exceptions${qp}`)
+      .then(r => r.json())
+      .then(d => { if (Array.isArray(d)) setExceptionsList(d); })
+      .catch(() => {});
+  }, [session?.scope?.pharmacyId]);
   const [, setLocation] = useLocation();
   const [dateFilter, setDateFilter] = useState("all");
   const [pharmacyFilter, setPharmacyFilter] = useState("all");
 
-  const filteredExceptions = MOCK_EXCEPTIONS.filter((e) => {
+  const filteredExceptions = exceptionsList.filter((e) => {
      if (pharmacyFilter !== "all" && e.pharmacyId !== pharmacyFilter) return false;
      
      if (dateFilter === "today") {
