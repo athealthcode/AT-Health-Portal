@@ -188,6 +188,32 @@ export default function Login() {
                     Verify & Sign In
                   </Button>
                   <Button
+                    variant="outline"
+                    className="h-11 w-full text-sm text-muted-foreground"
+                    disabled={isLoading}
+                    onClick={async () => {
+                      setIsLoading(true);
+                      try {
+                        await signIn({ email, password });
+                        setCode("");
+                        toast({
+                          title: "Code Resent",
+                          description: "A new verification code has been sent to your email.",
+                        });
+                      } catch {
+                        toast({
+                          title: "Failed to resend",
+                          description: "Please go back and try again.",
+                          variant: "destructive",
+                        });
+                      } finally {
+                        setIsLoading(false);
+                      }
+                    }}
+                  >
+                    Forgot your password? Resend code
+                  </Button>
+                  <Button
                     variant="ghost"
                     className="h-11 w-full text-muted-foreground hover:text-foreground"
                     onClick={() => {
