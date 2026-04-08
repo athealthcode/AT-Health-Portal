@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/state/auth";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { 
-   AlertTriangle, ShieldAlert, Plus, MessageSquare, Clock, ArrowRight, Activity, Thermometer, BriefcaseMedical, ChevronRight, User, Calendar as CalendarIcon, Filter, Building2, AlignLeft, CheckCircle2
+   AlertTriangle, ShieldAlert, Plus, MessageSquare, Clock, ArrowRight, Activity, Thermometer, BriefcaseMedical, ChevronRight, User, Calendar as CalendarIcon, Filter, Building2, AlignLeft, CheckCircle2, Monitor
 } from "lucide-react";
 import { format } from "date-fns";
 
