@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,13 +7,19 @@ import { useAuth } from "@/state/auth";
 import { CalendarIcon, CheckCircle2, AlertTriangle, ArrowRight, Lock, FileText, Check, Unlock, CheckSquare } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-const MOCK_MONTHS = [
-  { month: "February 2026", status: "closed", completedBy: "info@at-health.co.uk", date: "02 Mar 2026" },
-  { month: "March 2026", status: "open" }
-];
+
 
 export default function MonthlyClose() {
   const { session } = useAuth();
+  const [closedMonths, setClosedMonths] = useState<any[]>([]);
+  useEffect(() => {
+    const phId = session?.scope?.pharmacyId;
+    const qp = phId ? `?pharmacy_id=${phId}` : "";
+    fetch(`/api/monthly-close${qp}`)
+      .then(r => r.json())
+      .then(d => { if (Array.isArray(d)) setClosedMonths(d); })
+      .catch(() => {});
+  }, [session?.scope?.pharmacyId]);
   const isHeadOffice = session.scope.type === "headoffice";
   const [pharmacy, setPharmacy] = useState<string>(isHeadOffice ? "bowland" : session.scope.type === "pharmacy" ? session.scope.pharmacyId : "bowland");
   
@@ -153,7 +159,7 @@ export default function MonthlyClose() {
               <Card className="rounded-2xl border bg-card/60 shadow-sm p-5">
                  <h3 className="font-semibold mb-4 text-sm uppercase tracking-wider text-muted-foreground">Historical Closes</h3>
                  <div className="space-y-3">
-                    {MOCK_MONTHS.filter(m => m.status === 'closed').map(m => (
+                    {closedMonths.filter(m => m.status === 'closed').map(m => (
                        <div key={m.month} className="p-3 bg-background/50 rounded-lg border flex flex-col gap-2">
                           <div className="flex justify-between items-center">
                              <div className="font-medium text-sm">{m.month}</div>
