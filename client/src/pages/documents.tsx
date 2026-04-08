@@ -37,15 +37,19 @@ const PHARMACIES = [
   { id: "wilmslow", name: "Wilmslow Pharmacy" },
 ];
 
-const MOCK_SOPS = [
-  { id: "sop1", title: "Information Governance v4.2", published: "2026-03-01", due: "2026-03-15", status: "pending", readAt: null },
-  { id: "sop2", title: "Controlled Drugs Handling", published: "2026-02-15", due: "2026-02-28", status: "read", readAt: "2026-02-20" },
-  { id: "sop3", title: "Locum Induction Checklist", published: "2026-01-10", due: "2026-01-30", status: "read", readAt: "2026-01-12" },
-  { id: "sop4", title: "Emergency Contraception PGD", published: "2026-03-05", due: "2026-03-10", status: "overdue", readAt: null },
-];
+
 
 export default function Documents() {
   const { session } = useAuth();
+  const [documentsList, setDocumentsList] = useState<any[]>([]);
+  useEffect(() => {
+    const phId = session?.scope?.pharmacyId;
+    const qp = phId ? `?pharmacy_id=${phId}` : "";
+    fetch(`/api/documents${qp}`)
+      .then(r => r.json())
+      .then(d => { if (Array.isArray(d)) setDocumentsList(d); })
+      .catch(() => {});
+  }, [session?.scope?.pharmacyId]);
   const [fallbackOnly, setFallbackOnly] = useState(false);
   const [config, setConfig] = useState(DEFAULT_CONFIG);
   
@@ -130,7 +134,7 @@ export default function Documents() {
                    {isHeadOffice && <Button size="sm" variant="outline">Publish New SOP</Button>}
                 </div>
                 <div className="divide-y">
-                   {MOCK_SOPS.map(sop => (
+                   {documentsList.map(sop => (
                       <div key={sop.id} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-muted/20 transition-colors">
                          <div className="flex items-start gap-3">
                             <div className={`mt-1 h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${sop.status === 'read' ? 'bg-emerald-100 text-emerald-600' : sop.status === 'overdue' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'}`}>
