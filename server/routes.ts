@@ -508,14 +508,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     try {
       const { pharmacy_id } = req.query as Record<string, string>;
       const q = pharmacy_id ? `*&pharmacy_id=eq.${pharmacy_id}&order=full_name.asc` : `*&order=full_name.asc`;
-      const rows = await sbGet("staff", q);
+      const { rows } = await sbGetRaw("staff_members", q);
       return res.json(rows ?? []);
     } catch (e: any) { return res.status(500).json({ error: e.message }); }
   });
 
   app.patch("/api/staff/:id", async (req, res) => {
     try {
-      const row = await sbPatch("staff", req.params.id, req.body);
+      const row = await sbPatch("staff_members", req.params.id, req.body);
       return res.json(row);
     } catch (e: any) { return res.status(500).json({ error: e.message }); }
   });
