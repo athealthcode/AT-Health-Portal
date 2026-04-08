@@ -35,21 +35,36 @@ export default function CashingUp() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { session } = useAuth();
+  // Load saved cashing-up records from DB
+  useEffect(() => {
+    const phId = session.scope?.pharmacyId;
+    const qp = phId ? `?pharmacy_id=${phId}` : "";
+    fetch(`/api/cashing-up${qp}`)
+      .then(r => r.json())
+      .then(rows => {
+        if (!Array.isArray(rows)) return;
+        const byDate: Record<string, any> = {};
+        rows.forEach((row: any) => {
+          const key = row.date ? row.date.substring(0, 10) : row.id;
+          byDate[key] = {
+            user: row.submitted_by || "",
+            timestamp: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
+            inputs: { ...row },
+            payouts: row.payouts ? JSON.parse(row.payouts) : [],
+            banking: row.banking_records ? JSON.parse(row.banking_records) : [],
+          };
+        });
+        setSubmittedData(byDate);
+      })
+      .catch(() => {});
+  }, [session.scope?.pharmacyId]);
 
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [selectedBranchId, setSelectedBranchId] = useState<string>("all");
   
   // Custom mock data for historical view
   const formattedDate = date ? format(date, "yyyy-MM-dd") : "";
-  const [submittedData, setSubmittedData] = useState<Record<string, any>>({
-     "2026-03-01": { 
-        user: "John Smith", 
-        timestamp: new Date().getTime() - 86400000, 
-        inputs: { vatStandard: "120.00", vatExempt: "0.00", vatZero: "50.00", vatLow: "0.00", vatNone: "0.00", toBeBanked: "50.00", readingCard: "120.00", userVariance: "0.00" },
-        payouts: [{ id: "1", type: "locum", label: "Dr Sarah", amount: "250.00", invoiceUploaded: true }],
-        banking: [{ id: "b1", amount: "500.00", location: "Barclays High St" }]
-     }
-  });
+  const [submittedData, setSubmittedData] = useState<Record<string, any>>({});
 
   const existingRecord = submittedData[formattedDate];
   const isHeadOffice = session.scope.type === "headoffice";
@@ -230,6 +245,18 @@ export default function CashingUp() {
        }
     }));
     
+    fetch('/api/cashing-up', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pharmacy_id: session.scope.pharmacyId || session.scope.pharmacyName,
+        date: format(date!, 'yyyy-MM-dd'),
+        submitted_by: session.staff?.name || session.userEmail,
+        ...inputs,
+        payouts: JSON.stringify(payouts),
+        banking_records: JSON.stringify(banking),
+      })
+    }).catch(console.error);
     setIsEditingMode(false);
     toast({ title: "Submitted", description: `Cashing up saved for ${format(date!, "PPP")}.` });
   };
