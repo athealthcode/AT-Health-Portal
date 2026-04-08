@@ -284,7 +284,7 @@ export default function Admin() {
                          <TableCell data-testid={`text-user-email-${u.id}`}>{u.email || u.name}</TableCell>
                          <TableCell data-testid={`text-user-role-${u.id}`}>{u.role}</TableCell>
                          <TableCell data-testid={`text-user-scope-${u.id}`}>
-                           {u.pharmacy_id ? (u.pharmacy_name || u.pharmacy_id) : "Head Office"}
+                           {u.pharmacy_id ? (u.pharmacies?.name || u.pharmacy_id) : "Head Office"}
                          </TableCell>
                          <TableCell className="text-right">
                            <div className="flex justify-end gap-1">
