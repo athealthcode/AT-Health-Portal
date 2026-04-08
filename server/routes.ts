@@ -265,10 +265,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.get("/api/incidents", async (req, res) => {
     try {
       const { pharmacy_id, status, archived } = req.query as Record<string, string>;
-      let q = `*&order=created_at.desc`;
-      if (pharmacy_id) q = `*&pharmacy_id=eq.${pharmacy_id}&order=created_at.desc`;
-      const { rows } = await sbGetRaw("incidents", q);
-      let data = rows ?? [];
+      let qs = `select=*&order=created_at.desc`;
+      if (pharmacy_id) qs = `select=*&pharmacy_id=eq.${pharmacy_id}&order=created_at.desc`;
+      let data: any[] = await sbGetRaw(`/incidents?${qs}`);
       if (status) data = data.filter((r: any) => r.status === status);
       if (archived !== "true") data = data.filter((r: any) => !r.is_archived);
       return res.json(data);
@@ -284,7 +283,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.patch("/api/incidents/:id", async (req, res) => {
     try {
-      const row = await sbPatch("incidents", req.params.id, req.body);
+      const row = await sbPatch("incidents", `id=eq.${req.params.id}`, req.body);
       return res.json(row);
     } catch (e: any) { return res.status(500).json({ error: e.message }); }
   });
@@ -293,16 +292,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.get("/api/cashing-up", async (req, res) => {
     try {
       const { pharmacy_id, date, month } = req.query as Record<string, string>;
-      let q = `*&order=date.desc`;
-      if (pharmacy_id && month) {
-        q = `*&pharmacy_id=eq.${pharmacy_id}&date=gte.${month}-01&date=lte.${month}-31&order=date.desc`;
-      } else if (pharmacy_id && date) {
-        q = `*&pharmacy_id=eq.${pharmacy_id}&date=eq.${date}`;
-      } else if (pharmacy_id) {
-        q = `*&pharmacy_id=eq.${pharmacy_id}&order=date.desc`;
-      }
-      const { rows } = await sbGetRaw("cashing_up", q);
-      return res.json(rows ?? []);
+      let qs = `select=*&order=date.desc`;
+      if (pharmacy_id && month) qs = `select=*&pharmacy_id=eq.${pharmacy_id}&date=gte.${month}-01&date=lte.${month}-31&order=date.desc`;
+      else if (pharmacy_id && date) qs = `select=*&pharmacy_id=eq.${pharmacy_id}&date=eq.${date}`;
+      else if (pharmacy_id) qs = `select=*&pharmacy_id=eq.${pharmacy_id}&order=date.desc`;
+      const data: any[] = await sbGetRaw(`/cashing_up?${qs}`);
+      return res.json(data);
     } catch (e: any) { return res.status(500).json({ error: e.message }); }
   });
 
@@ -315,7 +310,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.patch("/api/cashing-up/:id", async (req, res) => {
     try {
-      const row = await sbPatch("cashing_up", req.params.id, req.body);
+      const row = await sbPatch("cashing_up", `id=eq.${req.params.id}`, req.body);
       return res.json(row);
     } catch (e: any) { return res.status(500).json({ error: e.message }); }
   });
@@ -324,11 +319,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.get("/api/bookkeeping", async (req, res) => {
     try {
       const { pharmacy_id, month } = req.query as Record<string, string>;
-      let q = `*&order=month.desc`;
-      if (pharmacy_id && month) q = `*&pharmacy_id=eq.${pharmacy_id}&month=eq.${month}`;
-      else if (pharmacy_id) q = `*&pharmacy_id=eq.${pharmacy_id}&order=month.desc`;
-      const { rows } = await sbGetRaw("bookkeeping_submissions", q);
-      return res.json(rows ?? []);
+      let qs = `select=*&order=month.desc`;
+      if (pharmacy_id && month) qs = `select=*&pharmacy_id=eq.${pharmacy_id}&month=eq.${month}`;
+      else if (pharmacy_id) qs = `select=*&pharmacy_id=eq.${pharmacy_id}&order=month.desc`;
+      const data: any[] = await sbGetRaw(`/bookkeeping_submissions?${qs}`);
+      return res.json(data);
     } catch (e: any) { return res.status(500).json({ error: e.message }); }
   });
 
@@ -341,7 +336,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.patch("/api/bookkeeping/:id", async (req, res) => {
     try {
-      const row = await sbPatch("bookkeeping_submissions", req.params.id, req.body);
+      const row = await sbPatch("bookkeeping_submissions", `id=eq.${req.params.id}`, req.body);
       return res.json(row);
     } catch (e: any) { return res.status(500).json({ error: e.message }); }
   });
@@ -350,14 +345,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.get("/api/banking-reconciliation", async (req, res) => {
     try {
       const { pharmacy_id, month } = req.query as Record<string, string>;
-      let q = `*&order=date.desc`;
-      if (pharmacy_id && month) {
-        q = `*&pharmacy_id=eq.${pharmacy_id}&date=gte.${month}-01&date=lte.${month}-31&order=date.desc`;
-      } else if (pharmacy_id) {
-        q = `*&pharmacy_id=eq.${pharmacy_id}&order=date.desc`;
-      }
-      const { rows } = await sbGetRaw("banking_reconciliation", q);
-      return res.json(rows ?? []);
+      let qs = `select=*&order=date.desc`;
+      if (pharmacy_id && month) qs = `select=*&pharmacy_id=eq.${pharmacy_id}&date=gte.${month}-01&date=lte.${month}-31&order=date.desc`;
+      else if (pharmacy_id) qs = `select=*&pharmacy_id=eq.${pharmacy_id}&order=date.desc`;
+      const data: any[] = await sbGetRaw(`/banking_reconciliation?${qs}`);
+      return res.json(data);
     } catch (e: any) { return res.status(500).json({ error: e.message }); }
   });
 
@@ -370,7 +362,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.patch("/api/banking-reconciliation/:id", async (req, res) => {
     try {
-      const row = await sbPatch("banking_reconciliation", req.params.id, req.body);
+      const row = await sbPatch("banking_reconciliation", `id=eq.${req.params.id}`, req.body);
       return res.json(row);
     } catch (e: any) { return res.status(500).json({ error: e.message }); }
   });
@@ -379,9 +371,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.get("/api/pqs", async (req, res) => {
     try {
       const { pharmacy_id } = req.query as Record<string, string>;
-      const q = pharmacy_id ? `*&pharmacy_id=eq.${pharmacy_id}&order=criteria_id.asc` : `*&order=criteria_id.asc`;
-      const { rows } = await sbGetRaw("pqs_progress", q);
-      return res.json(rows ?? []);
+      const qs = pharmacy_id ? `select=*&pharmacy_id=eq.${pharmacy_id}&order=criteria_id.asc` : `select=*&order=criteria_id.asc`;
+      const data: any[] = await sbGetRaw(`/pqs_progress?${qs}`);
+      return res.json(data);
     } catch (e: any) { return res.status(500).json({ error: e.message }); }
   });
 
@@ -394,20 +386,20 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.patch("/api/pqs/:id", async (req, res) => {
     try {
-      const row = await sbPatch("pqs_progress", req.params.id, req.body);
+      const row = await sbPatch("pqs_progress", `id=eq.${req.params.id}`, req.body);
       return res.json(row);
     } catch (e: any) { return res.status(500).json({ error: e.message }); }
   });
 
-  // ── BONUS / BONUS MONTHS ───────────────────────────────────
+  // ── BONUS MONTHS ───────────────────────────────────────────
   app.get("/api/bonus-months", async (req, res) => {
     try {
       const { pharmacy_id, month } = req.query as Record<string, string>;
-      let q = `*&order=month.desc`;
-      if (pharmacy_id && month) q = `*&pharmacy_id=eq.${pharmacy_id}&month=eq.${month}`;
-      else if (pharmacy_id) q = `*&pharmacy_id=eq.${pharmacy_id}&order=month.desc`;
-      const { rows } = await sbGetRaw("bonus_months", q);
-      return res.json(rows ?? []);
+      let qs = `select=*&order=month.desc`;
+      if (pharmacy_id && month) qs = `select=*&pharmacy_id=eq.${pharmacy_id}&month=eq.${month}`;
+      else if (pharmacy_id) qs = `select=*&pharmacy_id=eq.${pharmacy_id}&order=month.desc`;
+      const data: any[] = await sbGetRaw(`/bonus_months?${qs}`);
+      return res.json(data);
     } catch (e: any) { return res.status(500).json({ error: e.message }); }
   });
 
@@ -420,7 +412,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.patch("/api/bonus-months/:id", async (req, res) => {
     try {
-      const row = await sbPatch("bonus_months", req.params.id, req.body);
+      const row = await sbPatch("bonus_months", `id=eq.${req.params.id}`, req.body);
       return res.json(row);
     } catch (e: any) { return res.status(500).json({ error: e.message }); }
   });
@@ -429,11 +421,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.get("/api/monthly-close", async (req, res) => {
     try {
       const { pharmacy_id, month } = req.query as Record<string, string>;
-      let q = `*&order=month.desc`;
-      if (pharmacy_id && month) q = `*&pharmacy_id=eq.${pharmacy_id}&month=eq.${month}`;
-      else if (pharmacy_id) q = `*&pharmacy_id=eq.${pharmacy_id}&order=month.desc`;
-      const { rows } = await sbGetRaw("monthly_close", q);
-      return res.json(rows ?? []);
+      let qs = `select=*&order=month.desc`;
+      if (pharmacy_id && month) qs = `select=*&pharmacy_id=eq.${pharmacy_id}&month=eq.${month}`;
+      else if (pharmacy_id) qs = `select=*&pharmacy_id=eq.${pharmacy_id}&order=month.desc`;
+      const data: any[] = await sbGetRaw(`/monthly_close?${qs}`);
+      return res.json(data);
     } catch (e: any) { return res.status(500).json({ error: e.message }); }
   });
 
@@ -446,7 +438,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.patch("/api/monthly-close/:id", async (req, res) => {
     try {
-      const row = await sbPatch("monthly_close", req.params.id, req.body);
+      const row = await sbPatch("monthly_close", `id=eq.${req.params.id}`, req.body);
       return res.json(row);
     } catch (e: any) { return res.status(500).json({ error: e.message }); }
   });
@@ -455,11 +447,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.get("/api/compliance", async (req, res) => {
     try {
       const { pharmacy_id, month } = req.query as Record<string, string>;
-      let q = `*&order=created_at.desc`;
-      if (pharmacy_id && month) q = `*&pharmacy_id=eq.${pharmacy_id}&month=eq.${month}`;
-      else if (pharmacy_id) q = `*&pharmacy_id=eq.${pharmacy_id}&order=created_at.desc`;
-      const { rows } = await sbGetRaw("compliance_items", q);
-      return res.json(rows ?? []);
+      let qs = `select=*&order=created_at.desc`;
+      if (pharmacy_id && month) qs = `select=*&pharmacy_id=eq.${pharmacy_id}&month=eq.${month}`;
+      else if (pharmacy_id) qs = `select=*&pharmacy_id=eq.${pharmacy_id}&order=created_at.desc`;
+      const data: any[] = await sbGetRaw(`/compliance_items?${qs}`);
+      return res.json(data);
     } catch (e: any) { return res.status(500).json({ error: e.message }); }
   });
 
@@ -472,7 +464,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.patch("/api/compliance/:id", async (req, res) => {
     try {
-      const row = await sbPatch("compliance_items", req.params.id, req.body);
+      const row = await sbPatch("compliance_items", `id=eq.${req.params.id}`, req.body);
       return res.json(row);
     } catch (e: any) { return res.status(500).json({ error: e.message }); }
   });
@@ -480,12 +472,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // ── STOCK TRANSFER ────────────────────────────────────────
   app.get("/api/stock-transfer", async (req, res) => {
     try {
-      const { from_pharmacy_id, to_pharmacy_id, pharmacy_id } = req.query as Record<string, string>;
-      let q = `*&order=created_at.desc`;
-      if (pharmacy_id) q = `*&or=(from_pharmacy_id.eq.${pharmacy_id},to_pharmacy_id.eq.${pharmacy_id})&order=created_at.desc`;
-      else if (from_pharmacy_id) q = `*&from_pharmacy_id=eq.${from_pharmacy_id}&order=created_at.desc`;
-      const { rows } = await sbGetRaw("stock_transfers", q);
-      return res.json(rows ?? []);
+      const { pharmacy_id, from_pharmacy_id } = req.query as Record<string, string>;
+      let qs = `select=*&order=created_at.desc`;
+      if (pharmacy_id) qs = `select=*&or=(from_pharmacy_id.eq.${pharmacy_id},to_pharmacy_id.eq.${pharmacy_id})&order=created_at.desc`;
+      else if (from_pharmacy_id) qs = `select=*&from_pharmacy_id=eq.${from_pharmacy_id}&order=created_at.desc`;
+      const data: any[] = await sbGetRaw(`/stock_transfers?${qs}`);
+      return res.json(data);
     } catch (e: any) { return res.status(500).json({ error: e.message }); }
   });
 
@@ -498,7 +490,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.patch("/api/stock-transfer/:id", async (req, res) => {
     try {
-      const row = await sbPatch("stock_transfers", req.params.id, req.body);
+      const row = await sbPatch("stock_transfers", `id=eq.${req.params.id}`, req.body);
       return res.json(row);
     } catch (e: any) { return res.status(500).json({ error: e.message }); }
   });
@@ -507,15 +499,15 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.get("/api/staff", async (req, res) => {
     try {
       const { pharmacy_id } = req.query as Record<string, string>;
-      const q = pharmacy_id ? `*&pharmacy_id=eq.${pharmacy_id}&order=full_name.asc` : `*&order=full_name.asc`;
-      const { rows } = await sbGetRaw("staff_members", q);
-      return res.json(rows ?? []);
+      const qs = pharmacy_id ? `select=*&pharmacy_id=eq.${pharmacy_id}&order=full_name.asc` : `select=*&order=full_name.asc`;
+      const data: any[] = await sbGetRaw(`/staff_members?${qs}`);
+      return res.json(data);
     } catch (e: any) { return res.status(500).json({ error: e.message }); }
   });
 
   app.patch("/api/staff/:id", async (req, res) => {
     try {
-      const row = await sbPatch("staff_members", req.params.id, req.body);
+      const row = await sbPatch("staff_members", `id=eq.${req.params.id}`, req.body);
       return res.json(row);
     } catch (e: any) { return res.status(500).json({ error: e.message }); }
   });
@@ -524,11 +516,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.get("/api/documents", async (req, res) => {
     try {
       const { pharmacy_id, category } = req.query as Record<string, string>;
-      let q = `*&order=created_at.desc`;
-      if (pharmacy_id && category) q = `*&pharmacy_id=eq.${pharmacy_id}&category=eq.${category}&order=created_at.desc`;
-      else if (pharmacy_id) q = `*&pharmacy_id=eq.${pharmacy_id}&order=created_at.desc`;
-      const { rows } = await sbGetRaw("documents", q);
-      return res.json(rows ?? []);
+      let qs = `select=*&order=created_at.desc`;
+      if (pharmacy_id && category) qs = `select=*&pharmacy_id=eq.${pharmacy_id}&category=eq.${category}&order=created_at.desc`;
+      else if (pharmacy_id) qs = `select=*&pharmacy_id=eq.${pharmacy_id}&order=created_at.desc`;
+      const data: any[] = await sbGetRaw(`/documents?${qs}`);
+      return res.json(data);
     } catch (e: any) { return res.status(500).json({ error: e.message }); }
   });
 
@@ -541,7 +533,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.delete("/api/documents/:id", async (req, res) => {
     try {
-      await sbDelete("documents", req.params.id);
+      await sbDelete("documents", `id=eq.${req.params.id}`);
       return res.json({ success: true });
     } catch (e: any) { return res.status(500).json({ error: e.message }); }
   });
@@ -549,12 +541,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // ── REPORTS ───────────────────────────────────────────────
   app.get("/api/reports", async (req, res) => {
     try {
-      const { pharmacy_id, type, month } = req.query as Record<string, string>;
-      let q = `*&order=created_at.desc`;
-      if (pharmacy_id && type) q = `*&pharmacy_id=eq.${pharmacy_id}&type=eq.${type}&order=created_at.desc`;
-      else if (pharmacy_id) q = `*&pharmacy_id=eq.${pharmacy_id}&order=created_at.desc`;
-      const { rows } = await sbGetRaw("reports", q);
-      return res.json(rows ?? []);
+      const { pharmacy_id, type } = req.query as Record<string, string>;
+      let qs = `select=*&order=created_at.desc`;
+      if (pharmacy_id && type) qs = `select=*&pharmacy_id=eq.${pharmacy_id}&type=eq.${type}&order=created_at.desc`;
+      else if (pharmacy_id) qs = `select=*&pharmacy_id=eq.${pharmacy_id}&order=created_at.desc`;
+      const data: any[] = await sbGetRaw(`/reports?${qs}`);
+      return res.json(data);
     } catch (e: any) { return res.status(500).json({ error: e.message }); }
   });
 
@@ -569,14 +561,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.get("/api/private-clinic", async (req, res) => {
     try {
       const { pharmacy_id, month } = req.query as Record<string, string>;
-      let q = `*&order=date.desc`;
-      if (pharmacy_id && month) {
-        q = `*&pharmacy_id=eq.${pharmacy_id}&date=gte.${month}-01&date=lte.${month}-31&order=date.desc`;
-      } else if (pharmacy_id) {
-        q = `*&pharmacy_id=eq.${pharmacy_id}&order=date.desc`;
-      }
-      const { rows } = await sbGetRaw("private_clinic_services", q);
-      return res.json(rows ?? []);
+      let qs = `select=*&order=date.desc`;
+      if (pharmacy_id && month) qs = `select=*&pharmacy_id=eq.${pharmacy_id}&date=gte.${month}-01&date=lte.${month}-31&order=date.desc`;
+      else if (pharmacy_id) qs = `select=*&pharmacy_id=eq.${pharmacy_id}&order=date.desc`;
+      const data: any[] = await sbGetRaw(`/private_clinic_services?${qs}`);
+      return res.json(data);
     } catch (e: any) { return res.status(500).json({ error: e.message }); }
   });
 
@@ -589,7 +578,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.patch("/api/private-clinic/:id", async (req, res) => {
     try {
-      const row = await sbPatch("private_clinic_services", req.params.id, req.body);
+      const row = await sbPatch("private_clinic_services", `id=eq.${req.params.id}`, req.body);
       return res.json(row);
     } catch (e: any) { return res.status(500).json({ error: e.message }); }
   });
@@ -598,9 +587,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.get("/api/exceptions", async (req, res) => {
     try {
       const { pharmacy_id } = req.query as Record<string, string>;
-      const q = pharmacy_id ? `*&pharmacy_id=eq.${pharmacy_id}&order=created_at.desc` : `*&order=created_at.desc`;
-      const { rows } = await sbGetRaw("exceptions", q);
-      return res.json(rows ?? []);
+      const qs = pharmacy_id ? `select=*&pharmacy_id=eq.${pharmacy_id}&order=created_at.desc` : `select=*&order=created_at.desc`;
+      const data: any[] = await sbGetRaw(`/exceptions?${qs}`);
+      return res.json(data);
     } catch (e: any) { return res.status(500).json({ error: e.message }); }
   });
 
@@ -613,10 +602,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.patch("/api/exceptions/:id", async (req, res) => {
     try {
-      const row = await sbPatch("exceptions", req.params.id, req.body);
+      const row = await sbPatch("exceptions", `id=eq.${req.params.id}`, req.body);
       return res.json(row);
     } catch (e: any) { return res.status(500).json({ error: e.message }); }
   });
 
-return httpServer;
+
+  return httpServer;
 }
