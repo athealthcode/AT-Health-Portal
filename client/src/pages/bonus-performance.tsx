@@ -12,7 +12,7 @@ import { useAuth } from "@/state/auth";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { AlertCircle, CheckCircle2, Lock, Upload, FileSpreadsheet, TrendingUp, Download, ShieldCheck, FileText, ArrowRight, Save, History, Users } from "lucide-react";
+import { AlertCircle, CheckCircle2, Lock, Unlock, Upload, FileSpreadsheet, TrendingUp, Download, ShieldCheck, FileText, ArrowRight, Save, History, Users } from "lucide-react";
 import { format, getDaysInMonth, isWeekend } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 
