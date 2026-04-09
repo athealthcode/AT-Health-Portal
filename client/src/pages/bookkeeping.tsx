@@ -154,20 +154,45 @@ export default function Bookkeeping() {
     return () => clearInterval(interval);
   }, []);
 
-  // Load from local storage
+  // Load from API (with localStorage fallback)
   useEffect(() => {
      const savedData = localStorage.getItem('bookkeeping_data_v2');
      if (savedData) setChecklistData(JSON.parse(savedData));
-     
      const savedLocks = localStorage.getItem('bookkeeping_locks_v2');
      if (savedLocks) setLockedMonths(JSON.parse(savedLocks));
+     fetch('/api/bookkeeping')
+       .then((r: Response) => r.json())
+       .then((rows: any[]) => {
+         if (!Array.isArray(rows) || rows.length === 0) return;
+         const merged: Record<string, any> = {};
+         const apilocks: Record<string, boolean> = {};
+         rows.forEach((row: any) => {
+           if (row.completed_items && typeof row.completed_items === 'object') {
+             Object.assign(merged, row.completed_items);
+           }
+           if (row.month && row.is_locked) apilocks[row.month] = true;
+         });
+         if (Object.keys(merged).length > 0) setChecklistData(merged);
+         if (Object.keys(apilocks).length > 0) setLockedMonths(apilocks);
+       })
+       .catch(() => {});
   }, []);
 
   const saveToStorage = (data: any, locks: any) => {
      localStorage.setItem('bookkeeping_data_v2', JSON.stringify(data));
      localStorage.setItem('bookkeeping_locks_v2', JSON.stringify(locks));
+     const phId = (session as any)?.scope?.pharmacyId ?? null;
+     const months = [...new Set(Object.keys(data).map((k: string) => k.length >= 7 ? k.substring(0, 7) : ''))].filter(Boolean) as string[];
+     months.forEach((month: string) => {
+       const monthItems = Object.fromEntries(Object.entries(data).filter(([k]) => (k as string).startsWith(month)));
+       const isLocked = !!(locks as any)[month];
+       fetch('/api/bookkeeping', {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({ pharmacy_id: phId, month, completed_items: monthItems, is_locked: isLocked })
+       }).catch(() => {});
+     });
   };
-
   const isHeadOffice = session.scope.type === "headoffice";
   const monthKey = `${year}-${selectedMonth}`;
   const isLocked = lockedMonths.includes(monthKey);
