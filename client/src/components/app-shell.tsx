@@ -15,12 +15,9 @@ import {
   Shield,
   AlertTriangle,
   ShieldCheck,
-  ClipboardList,
-  Wallet,
   CheckSquare,
   Activity,
   BriefcaseMedical,
-  Truck,
   HeartPulse
 } from "lucide-react";
 import { motion } from "framer-motion";
@@ -87,36 +84,17 @@ export function AppShell({ children }: PropsWithChildren) {
         testId: "link-nav-compliance",
       },
       {
-        href: "/pqs",
-        label: "PQS Tracker",
-        icon: ClipboardList,
-        testId: "link-nav-pqs",
-      },
-      {
         href: "/private-clinic",
         label: "Private Clinic",
         icon: HeartPulse,
         testId: "link-nav-private-clinic",
       },
       {
-        href: "/stock-transfer",
-        label: "Stock Transfers",
-        icon: Truck,
-        testId: "link-nav-stock-transfer",
-      },
-      {
-        href: "/banking-reconciliation",
-        label: "Banking Recon",
-        icon: Wallet,
-        testId: "link-nav-banking-recon",
-        requiresRole: (r) => r === "Finance" || r === "Head Office Admin" || r === "Super Admin",
-      },
-      {
         href: "/monthly-close",
         label: "Monthly Close",
         icon: CheckSquare,
         testId: "link-nav-monthly-close",
-        requiresRole: (r) => r === "Pharmacy Manager" || r === "Head Office Admin" || r === "Super Admin",
+        ,
       },
       {
         href: "/reports",
@@ -133,12 +111,6 @@ export function AppShell({ children }: PropsWithChildren) {
         requiresRole: (r) => r === "Head Office Admin" || r === "Super Admin",
       },
       {
-        href: "/documents",
-        label: "Documents & SOPs",
-        icon: Files,
-        testId: "link-nav-documents",
-      },
-      {
         href: "/access-overview",
         label: "Access Overview",
         icon: Shield,
@@ -151,61 +123,7 @@ export function AppShell({ children }: PropsWithChildren) {
         icon: Settings,
         testId: "link-nav-admin",
         requiresRole: (r) => r === "Head Office Admin" || r === "Super Admin",
-      },
-      {
-         href: "/onboarding",
-         label: "Org Onboarding",
-         icon: Building2,
-         testId: "link-nav-onboarding",
-         requiresRole: (r) => r === "Super Admin",
-      }
-    ],
-    [],
-  );
-
-  const visibleNav = navItems.filter((n) => {
-    if (n.requiresRole && !n.requiresRole(session.role)) return false;
-    if (n.moduleKey && modules[n.moduleKey] === false) return false;
-    return true;
-  });
-
-  const scopeLabel =
-    session.scope.type === "pharmacy" ? session.scope.pharmacyName : "Head Office";
-
-  const header = (
-    <div className="flex flex-col gap-4">
-      <div className="bg-primary/5 rounded-xl p-4 flex items-center justify-center">
-         {settings.logoUrl ? (
-            <img src={settings.logoUrl} alt={settings.name} className="h-10 w-auto object-contain" />
-         ) : (
-            <img src={logo} alt="AT Health" className="h-10 w-auto object-contain" />
-         )}
-      </div>
-
-      <div className="px-1">
-        <div className="font-medium text-sm text-foreground" data-testid="text-scope">{scopeLabel}</div>
-        <div className="flex items-center gap-2 mt-1">
-          <Badge variant="secondary" className="pill bg-background/50 text-[10px] h-5" data-testid="badge-role">
-            {session.role ?? "Guest"}
-          </Badge>
-          {session.staff && (
-             <Badge variant="outline" className="pill bg-background/50 text-[10px] h-5" data-testid="badge-staff">
-                {session.staff.name}
-             </Badge>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-
-  function NavLinks({ compact }: { compact?: boolean }) {
-    // Group navigation items by section
-    const groupedNav = visibleNav.reduce((acc, item) => {
-      const section = item.section || "Other";
-      if (!acc[section]) acc[section] = [];
-      acc[section].push(item);
-      return acc;
-    }, {} as Record<string, NavItem[]>);
+      }, {} as Record<string, NavItem[]>);
 
     const sectionOrder = ["Head Office", "Operations", "Banking", "Bonus", "Compliance", "Reports", "Documents", "Settings", "Other"];
 
