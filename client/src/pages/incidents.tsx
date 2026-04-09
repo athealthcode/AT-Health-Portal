@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -34,38 +34,7 @@ interface Incident {
    notes: Array<{date: number, text: string, user: string}>;
 }
 
-const MOCK_INCIDENTS: Incident[] = [
-   { 
-      id: "INC-1042", branch: "Bowland Pharmacy", branchId: "bowland", category: "Fridge Temp", severity: "High", 
-      title: "Fridge 1 excursion: 9°C for 30 mins", description: "Temperature logged at 9.2°C at 08:30. Reset by 09:00.",
-      status: "Investigating", daysOpen: 1, createdAt: Date.now() - 86400000, createdBy: "John Smith",
-      dueDate: Date.now() + 86400000 * 2, owner: "Sarah Ahmed", notes: []
-   },
-   { 
-      id: "INC-1041", branch: "Denton Pharmacy", branchId: "denton", category: "Near Miss", severity: "Medium", 
-      title: "Wrong strength picked during dispensing", description: "Picked 10mg instead of 5mg. Caught by pharmacist during final check.",
-      status: "Open", daysOpen: 2, createdAt: Date.now() - 86400000 * 2, createdBy: "Jane Doe",
-      dueDate: Date.now() + 86400000 * 5, owner: "Unassigned", notes: []
-   },
-   { 
-      id: "INC-1039", branch: "Wilmslow Pharmacy", branchId: "wilmslow", category: "Patient Complaint", severity: "Medium", 
-      title: "Delay in delivery causing missed dose", description: "Patient called to complain delivery arrived 1 day late.",
-      status: "HO Review", daysOpen: 5, createdAt: Date.now() - 86400000 * 5, createdBy: "Mark Wilson",
-      dueDate: Date.now() - 86400000, owner: "Helen Carter", notes: [{date: Date.now()-86400000, text: "Sent to HO for review", user: "Mark Wilson"}]
-   },
-   { 
-      id: "INC-1035", branch: "Denton Pharmacy", branchId: "denton", category: "IT Issue", severity: "Low", 
-      title: "Scanner terminal disconnected", description: "Terminal 2 scanner not reading barcodes.",
-      status: "Waiting on Branch", daysOpen: 7, createdAt: Date.now() - 86400000 * 7, createdBy: "Jane Doe",
-      dueDate: Date.now() - 86400000 * 2, owner: "IT Support", notes: [{date: Date.now()-86400000*3, text: "Requested photo of back of terminal", user: "IT Support"}]
-   },
-   { 
-      id: "INC-1012", branch: "Bowland Pharmacy", branchId: "bowland", category: "Staffing", severity: "Medium", 
-      title: "Pharmacist sickness tomorrow", description: "Locum required urgently.",
-      status: "Closed", daysOpen: 0, createdAt: Date.now() - 86400000 * 14, createdBy: "John Smith",
-      dueDate: Date.now() - 86400000 * 13, owner: "HR Team", notes: []
-   },
-];
+
 
 const CATEGORIES = [
   "Near miss", "Dispensing incident", "Complaint", "Compliance breach", 
@@ -87,9 +56,18 @@ function getCategoryIcon(category: string) {
 
 export default function Incidents() {
    const { session } = useAuth();
+  // Load incidents from DB
+  useEffect(() => {
+    const phId = session?.scope?.pharmacyId;
+    const qp = phId && !isHeadOffice ? `?pharmacy_id=${phId}` : "";
+    fetch(`/api/incidents${qp}`)
+      .then(r => r.json())
+      .then(rows => { if (Array.isArray(rows)) setIncidents(rows as Incident[]); })
+      .catch(() => {});
+  }, [session?.scope?.pharmacyId, isHeadOffice]);
    const isHeadOffice = session.scope.type === "headoffice";
    
-   const [incidents, setIncidents] = useState<Incident[]>(MOCK_INCIDENTS);
+   const [incidents, setIncidents] = useState<Incident[]>([]);
    const [selectedBranch, setSelectedBranch] = useState<string>("all");
    const [statusFilter, setStatusFilter] = useState<string>("open");
    
@@ -134,7 +112,26 @@ export default function Incidents() {
          notes: []
       };
       
-      setIncidents([newInc, ...incidents]);
+      fetch('/api/incidents', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pharmacy_id: newInc.branchId,
+        pharmacy_name: newInc.branch,
+        category: newInc.category,
+        severity: newInc.severity,
+        title: newInc.title,
+        description: newInc.description,
+        status: newInc.status,
+        created_by: newInc.createdBy,
+        owner: newInc.owner,
+        due_date: new Date(newInc.dueDate).toISOString(),
+      })
+    }).then(r => r.json()).then(saved => {
+      if (saved && saved.id) setIncidents(prev => [{ ...newInc, id: saved.id }, ...prev]);
+      else setIncidents(prev => [newInc, ...prev]);
+    }).catch(() => setIncidents(prev => [newInc, ...prev]));
+    
       setIsCreateOpen(false);
    };
 
