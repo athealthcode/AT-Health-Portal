@@ -163,6 +163,52 @@ export default function BonusPerformance() {
      }));
   };
 
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Load saved state from DB when month changes
+  useEffect(() => {
+    fetch(`/api/bonus-months?month=${selectedMonth}`)
+      .then((r: Response) => r.json())
+      .then((rows: any[]) => {
+        if (!Array.isArray(rows)) return;
+        const row = rows.find((r: any) => r.month === selectedMonth && r.state_data);
+        if (row?.state_data) {
+          setMonthlyData(prev => ({ ...prev, [selectedMonth]: row.state_data as MonthlyState }));
+        }
+      })
+      .catch(() => {});
+  }, [selectedMonth]);
+
+  const handleSaveToDb = async () => {
+    setIsSaving(true);
+    try {
+      const existing = await fetch(`/api/bonus-months?month=${selectedMonth}`)
+        .then((r: Response) => r.json())
+        .then((rows: any[]) => Array.isArray(rows) ? rows.find((r: any) => r.month === selectedMonth) : null)
+        .catch(() => null);
+      const payload = {
+        month: selectedMonth,
+        status: currentData.status,
+        state_data: currentData,
+      };
+      if (existing?.id) {
+        await fetch(`/api/bonus-months/${existing.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+      } else {
+        await fetch('/api/bonus-months', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+      }
+    } catch (_) { /* silent */ } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleGateToggle = (pharmacyId: PharmacyId, gateId: string) => {
      updateMonth(m => {
         const pGates = m.gates[pharmacyId].map(g => g.id === gateId ? { ...g, passed: !g.passed } : g);
@@ -375,7 +421,15 @@ export default function BonusPerformance() {
                     </Button>
                  )
               )}
-           </div>
+
+
+               <Button
+                  className="h-10 bg-blue-600 hover:bg-blue-700"
+                  onClick={handleSaveToDb}
+                  disabled={isSaving}
+               >
+                  {isSaving ? 'Saving...' : '💾 Save to Database'}
+               </Button>           </div>
         </div>
 
         {currentData.status === "not_completed" ? (
