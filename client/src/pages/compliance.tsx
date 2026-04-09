@@ -27,7 +27,8 @@ export default function Compliance() {
   const [complianceItems, setComplianceItems] = useState<any>({
     score: 0, previousScore: 0,
     metrics: { dailyFigures: 0, cashingUp: 0, bookkeeping: 0, missing: 0, late: 0, notCompleted: 0, exceptions: 0 },
-    leagueTable: []
+    leagueTable: [],
+    missedDates: []
   });
   useEffect(() => {
     const phId = session?.scope?.pharmacyId;
