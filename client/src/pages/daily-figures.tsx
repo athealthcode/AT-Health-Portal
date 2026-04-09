@@ -29,8 +29,8 @@ const PRESCRIPTION_FIELDS = [
 
 const OTHER_FIELDS: ServiceField[] = [
   { key: "ssp", label: "SSP", group: "Figures" },
-  { key: "nhs_prepayment", label: "NHS Prepayment (Â£)", group: "Figures", isCurrency: true },
-  { key: "fp57_refund", label: "FP57 Refund (Â£)", group: "Figures", isCurrency: true },
+  { key: "nhs_prepayment", label: "NHS Prepayment (£)", group: "Figures", isCurrency: true },
+  { key: "fp57_refund", label: "FP57 Refund (£)", group: "Figures", isCurrency: true },
   { key: "nms_intervention", label: "NMS Intervention", group: "NMS" },
   { key: "nms_follow_up", label: "NMS Follow-up", group: "NMS" },
   { key: "dms_stage_1", label: "Stage 1", group: "DMS" },
@@ -203,18 +203,18 @@ export default function DailyFigures() {
         const isM3 = Math.abs(val % m3) < 0.01;
         
         if (!isM1 && !isM2 && !isM3) {
-           errors[key] = `Must be a multiple of Â£32.05, Â£114.50, or Â£19.80`;
+           errors[key] = `Must be a multiple of £32.05, £114.50, or £19.80`;
         }
      };
 
      validatePrepMult("nhs_prepayment");
 
-     // FP57 is typically multiples of Â£9.90
+     // FP57 is typically multiples of £9.90
      if (values["fp57_refund"] !== "" && values["fp57_refund"] !== "0" && values["fp57_refund"] !== "0.00") {
         const fp57 = Number(values["fp57_refund"]);
         const ratio = fp57 / 9.90;
         if (Math.abs(ratio - Math.round(ratio)) > 0.001) {
-           errors["fp57_refund"] = "Must be a multiple of Â£9.90";
+           errors["fp57_refund"] = "Must be a multiple of £9.90";
         }
      }
 
@@ -294,7 +294,10 @@ export default function DailyFigures() {
     <AppShell>
       <div className="flex flex-col gap-6">
         <div>
+          <div className="flex items-center justify-between">
           <div className="font-serif text-2xl tracking-tight">Daily Figures</div>
+          <div className="text-sm font-medium text-muted-foreground bg-primary/5 px-3 py-1.5 rounded-lg border border-primary/10">{format(new Date(), "MMMM yyyy")}</div>
+        </div>
           <div className="text-sm text-muted-foreground">
             Enter today's running totals. You must explicitly enter 0 for fields with no activity.
           </div>
@@ -311,7 +314,7 @@ export default function DailyFigures() {
                     <div className="font-mono font-bold text-lg">{m.value}</div>
                     <div className={`text-[10px] flex items-center mt-0.5 font-medium ${m.up ? "text-emerald-600" : "text-red-500"}`}>
                        {m.up ? <ArrowUpRight className="h-3 w-3 mr-0.5"/> : <ArrowDownRight className="h-3 w-3 mr-0.5"/>}
-                       {m.change}
+                       {m.change} <span className="text-muted-foreground font-normal opacity-60 ml-0.5">vs last month</span>
                     </div>
                  </div>
               </Card>
@@ -488,11 +491,11 @@ export default function DailyFigures() {
                            <div className="grid grid-cols-2 gap-4 mt-4">
                               <div className="bg-background/50 rounded-xl border p-3">
                                  <div className="text-xs text-muted-foreground mb-1">NHS Prepayment</div>
-                                 <div className="font-mono font-medium text-lg">Â£{Number(values["nhs_prepayment"] || 0).toFixed(2)}</div>
+                                 <div className="font-mono font-medium text-lg">£{Number(values["nhs_prepayment"] || 0).toFixed(2)}</div>
                               </div>
                               <div className="bg-background/50 rounded-xl border p-3">
                                  <div className="text-xs text-muted-foreground mb-1">FP57 Refund</div>
-                                 <div className="font-mono font-medium text-lg">Â£{Number(values["fp57_refund"] || 0).toFixed(2)}</div>
+                                 <div className="font-mono font-medium text-lg">£{Number(values["fp57_refund"] || 0).toFixed(2)}</div>
                               </div>
                            </div>
                         </div>
@@ -656,7 +659,7 @@ export default function DailyFigures() {
                               {f.label}
                             </Label>
                             <div className="relative">
-                               {f.isCurrency && <span className="absolute left-3 top-2.5 text-xs text-muted-foreground">Â£</span>}
+                               {f.isCurrency && <span className="absolute left-3 top-2.5 text-xs text-muted-foreground">£</span>}
                                <Input
                                  className={`font-mono h-10 ${f.isCurrency ? "pl-6" : ""} ${validationErrors[f.key] ? "border-destructive ring-destructive/20 focus-visible:ring-destructive/20" : ""}`}
                                  value={values[f.key]}
@@ -690,8 +693,8 @@ export default function DailyFigures() {
                 <div className="text-sm font-semibold mb-4">Form Guide</div>
                 <div className="space-y-4 text-xs text-muted-foreground">
                    <p><strong>0 Required:</strong> If no activity occurred for a specific metric, you must explicitly enter <code>0</code>.</p>
-                   <p><strong>NHS Prepayments:</strong> Ensure this matches the exact certificate cost (Â£32.05, Â£114.50, or Â£19.80). Validations enforce exact multiples.</p>
-                   <p><strong>FP57:</strong> Must be a multiple of Â£9.90.</p>
+                   <p><strong>NHS Prepayments:</strong> Ensure this matches the exact certificate cost (£32.05, £114.50, or £19.80). Validations enforce exact multiples.</p>
+                   <p><strong>FP57:</strong> Must be a multiple of £9.90.</p>
                    <Separator />
                    <p className="font-medium text-foreground">Need help?</p>
                    <p>Contact Head Office or raise an IT ticket if forms fail to submit.</p>
