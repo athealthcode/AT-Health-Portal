@@ -66,24 +66,6 @@ export default function Incidents() {
       .then(rows => { if (Array.isArray(rows)) setIncidents(rows as Incident[]); })
       .catch(() => {});
   }, [session?.scope?.pharmacyId, isHeadOffice]);
-  useEffect(() => {
-    const phId = session?.scope?.pharmacyId;
-    const qp = phId && !isHeadOffice ? `?pharmacy_id=${phId}` : "";
-    fetch(`/api/incidents${qp}`)
-      .then(r => r.json())
-      .then(rows => { if (Array.isArray(rows)) setIncidents(rows as Incident[]); })
-      .catch(() => {});
-  }, [session?.scope?.pharmacyId, isHeadOffice]);
-   const isHeadOffice = session.scope.type === "headoffice";
-  useEffect(() => {
-    const phId = session?.scope?.pharmacyId;
-    const qp = phId && !isHeadOffice ? `?pharmacy_id=${phId}` : "";
-    fetch(`/api/incidents${qp}`)
-      .then(r => r.json())
-      .then(rows => { if (Array.isArray(rows)) setIncidents(rows as Incident[]); })
-      .catch(() => {});
-  }, [session?.scope?.pharmacyId, isHeadOffice]);
-   const isHeadOffice = session.scope.type === "headoffice";
    
    const [incidents, setIncidents] = useState<Incident[]>([]);
    const [selectedBranch, setSelectedBranch] = useState<string>("all");
