@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth, Role } from "@/state/auth";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Trash2, AlertTriangle, Shield, Clock, Monitor, Info, Lock, Link as LinkIcon, Save, Palette, Edit, CheckCircle2 } from "lucide-react";
+import { Trash2, AlertTriangle, Shield, Clock, Monitor, Info, Lock, Link as LinkIcon, Save, Palette, Edit, CheckCircle2 , Pencil, KeyRound } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
@@ -44,6 +44,14 @@ export default function Admin() {
   const [staffList, setStaffList] = useState<any[]>([]);
   useEffect(() => {
     fetch('/api/staff').then(r => r.json()).then(d => { if (Array.isArray(d)) setStaffList(d); }).catch(() => {});
+  }, []);
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [editRoleUser, setEditRoleUser] = useState<any>(null);
+  const [newUserRole, setNewUserRole] = useState("");
+  const [pendingRequests, setPendingRequests] = useState<any[]>([]);
+  useEffect(() => {
+    fetch('/api/users').then(r => r.json()).then(d => { if (Array.isArray(d)) setAllUsers(d); }).catch(() => {});
+    fetch('/api/register-requests').then(r => r.json()).then(d => { if (Array.isArray(d)) setPendingRequests(d); }).catch(() => {});
   }, []);
   const { settings, setSettings, modules, setModules } = useOrg();
   
@@ -190,6 +198,7 @@ export default function Admin() {
               {isHeadOffice && <TabsTrigger value="templates">Templates & Workflows</TabsTrigger>}
               {isHeadOffice && <TabsTrigger value="whitelabel">Organisation</TabsTrigger>}
               {isHeadOffice && <TabsTrigger value="launch-control">Launch Control</TabsTrigger>}
+              {isHeadOffice && <TabsTrigger value="pending-approvals">Pending Approvals{pendingRequests.filter(r=>r.status==='pending').length>0&&<span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold w-4 h-4">{pendingRequests.filter(r=>r.status==='pending').length}</span>}</TabsTrigger>}
            </TabsList>
 
            <TabsContent value="users" className="grid gap-3 lg:grid-cols-2">
@@ -279,7 +288,7 @@ export default function Admin() {
                      </TableRow>
                    </TableHeader>
                    <TableBody>
-                     {staffList.map((u) => (
+                     {[...allUsers, ...staffList.filter(s => !allUsers.find(u => u.email === s.email))].map((u) => (
                        <TableRow key={u.id} data-testid={`row-user-${u.id}`}>
                          <TableCell data-testid={`text-user-email-${u.id}`}>{u.email || u.name}</TableCell>
                          <TableCell data-testid={`text-user-role-${u.id}`}>{u.role}</TableCell>
@@ -288,14 +297,9 @@ export default function Admin() {
                          </TableCell>
                          <TableCell className="text-right">
                            <div className="flex justify-end gap-1">
-                             <Button 
-                                size="sm" 
-                                variant="ghost" 
-                                onClick={() => setViewingUserBrowsers(u.id)}
-                                disabled={!canManageUsers}
-                             >
-                                <Shield className="h-4 w-4 text-muted-foreground" />
-                             </Button>
+                             <Button size="sm" variant="ghost" onClick={() => { setEditRoleUser(u); setNewUserRole(u.role || ""); }} disabled={!canManageUsers} title="Edit Role"><Pencil className="h-4 w-4 text-muted-foreground" /></Button>
+                             <Button size="sm" variant="ghost" disabled={!canManageUsers} title="Reset Password" onClick={async () => { try { await fetch('/api/reset-password', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ email: u.email }) }); toast({ title: "Password Reset Sent", description: `Reset email sent to ${u.email}` }); } catch { toast({ title: "Error", variant: "destructive" }); } }}><KeyRound className="h-4 w-4 text-muted-foreground" /></Button>
+                             <Button size="sm" variant="ghost" onClick={() => setViewingUserBrowsers(u.id)} disabled={!canManageUsers}><Shield className="h-4 w-4 text-muted-foreground" /></Button>
 
                              <Button
                                size="sm"
@@ -725,7 +729,94 @@ export default function Admin() {
                     </div>
                  </div>
               </Card>
-           </TabsContent>
+           {editRoleUser && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setEditRoleUser(null)}>
+                <div className="bg-background border rounded-2xl p-6 w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
+                  <div className="font-semibold mb-4">Edit Role — {editRoleUser.email}</div>
+                  <Select value={newUserRole} onValueChange={setNewUserRole}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="super_admin">Super Admin</SelectItem>
+                      <SelectItem value="ho_admin">HO Admin</SelectItem>
+                      <SelectItem value="pharmacy_manager">Pharmacy Manager</SelectItem>
+                      <SelectItem value="pharmacist">Pharmacist</SelectItem>
+                      <SelectItem value="dispenser">Dispenser</SelectItem>
+                      <SelectItem value="pharmacy_staff">Pharmacy Staff</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <div className="flex gap-2 mt-4">
+                    <Button className="flex-1" onClick={async () => {
+                      try {
+                        await fetch(`/api/users/${editRoleUser.id}`, { method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ role: newUserRole }) });
+                        setAllUsers(prev => prev.map(u => u.id === editRoleUser.id ? {...u, role: newUserRole} : u));
+                        toast({ title: "Role Updated" });
+                        setEditRoleUser(null);
+                      } catch { toast({ title: "Error", variant: "destructive" }); }
+                    }}>Save</Button>
+                    <Button variant="outline" className="flex-1" onClick={() => setEditRoleUser(null)}>Cancel</Button>
+                  </div>
+                </div>
+              </div>
+            )}
+<TabsContent value="pending-approvals">
+              <Card className="rounded-2xl border bg-card/60 p-5">
+                <div className="text-sm font-semibold mb-4">Pending Account Requests</div>
+                {pendingRequests.length === 0 ? (
+                  <div className="text-sm text-muted-foreground py-8 text-center">No pending requests</div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Pharmacy</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Submitted</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {pendingRequests.map((req) => (
+                        <TableRow key={req.id}>
+                          <TableCell>{req.full_name}</TableCell>
+                          <TableCell>{req.email}</TableCell>
+                          <TableCell>{req.pharmacy_name || "—"}</TableCell>
+                          <TableCell><Badge variant="outline">{req.role_requested}</Badge></TableCell>
+                          <TableCell>
+                            <Badge variant={req.status === 'pending' ? 'secondary' : req.status === 'approved' ? 'default' : 'destructive'}>
+                              {req.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-xs">{new Date(req.created_at).toLocaleDateString('en-GB')}</TableCell>
+                          <TableCell className="text-right">
+                            {req.status === 'pending' && (
+                              <div className="flex justify-end gap-1">
+                                <Button size="sm" variant="default" onClick={async () => {
+                                  try {
+                                    await fetch(`/api/register-requests/${req.id}`, { method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ status: 'approved', reviewed_by: session?.user?.email || 'admin' }) });
+                                    setPendingRequests(prev => prev.map(r => r.id === req.id ? {...r, status: 'approved'} : r));
+                                    toast({ title: "Request Approved", description: `${req.full_name} has been approved.` });
+                                  } catch { toast({ title: "Error", variant: "destructive" }); }
+                                }}>Approve</Button>
+                                <Button size="sm" variant="ghost" className="text-destructive hover:bg-destructive/10" onClick={async () => {
+                                  try {
+                                    await fetch(`/api/register-requests/${req.id}`, { method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ status: 'rejected', reviewed_by: session?.user?.email || 'admin' }) });
+                                    setPendingRequests(prev => prev.map(r => r.id === req.id ? {...r, status: 'rejected'} : r));
+                                    toast({ title: "Request Rejected" });
+                                  } catch { toast({ title: "Error", variant: "destructive" }); }
+                                }}>Reject</Button>
+                              </div>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </Card>
+            </TabsContent>
+</TabsContent>
         </Tabs>
 
            <Dialog open={!!editingPharmacy} onOpenChange={(o) => !o && setEditingPharmacy(null)}>
