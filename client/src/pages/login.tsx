@@ -230,6 +230,16 @@ export default function Login() {
           </div>
         </Card>
 
+        <div className="mt-6 text-center">
+          <span className="text-sm text-muted-foreground">Don&apos;t have an account?{" "}</span>
+          <button
+            className="text-sm font-medium text-primary hover:underline transition-colors"
+            onClick={() => setLocation("/register-request")}
+          >
+            Request Access
+          </button>
+        </div>
+
         <div className="mt-8 text-center space-y-4">
            <div className="text-xs text-muted-foreground flex justify-center gap-4">
               <span>Secure Connection</span>
