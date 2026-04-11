@@ -56,6 +56,7 @@ function getCategoryIcon(category: string) {
 
 export default function Incidents() {
    const { session } = useAuth();
+  const isHeadOffice = session.scope.type === "headoffice";
   // Load incidents from DB
   useEffect(() => {
     const phId = session?.scope?.pharmacyId;
@@ -73,7 +74,6 @@ export default function Incidents() {
       .then(rows => { if (Array.isArray(rows)) setIncidents(rows as Incident[]); })
       .catch(() => {});
   }, [session?.scope?.pharmacyId, isHeadOffice]);
-   const isHeadOffice = session.scope.type === "headoffice";
    const isHeadOffice = session.scope.type === "headoffice";
   useEffect(() => {
     const phId = session?.scope?.pharmacyId;
