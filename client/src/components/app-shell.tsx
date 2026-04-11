@@ -149,6 +149,8 @@ export function AppShell({ children }: PropsWithChildren) {
     return acc;
   }, {} as Record<string, NavItem[]>);
 
+
+  function NavLinks({ compact = false }: { compact?: boolean }) {
     const sectionOrder = ["Head Office", "Operations", "Banking", "Bonus", "Compliance", "Reports", "Documents", "Settings", "Other"];
 
     return (
