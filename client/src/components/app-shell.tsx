@@ -94,7 +94,6 @@ export function AppShell({ children }: PropsWithChildren) {
         label: "Monthly Close",
         icon: CheckSquare,
         testId: "link-nav-monthly-close",
-        ,
       },
       {
         href: "/reports",
