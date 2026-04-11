@@ -608,5 +608,32 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
 
+
+  // ── Registration Requests ────────────────────────────────────────────────
+  app.post("/api/register-request", async (req, res) => {
+    try {
+      const { full_name, email, phone, pharmacy_name, role_requested, message } = req.body;
+      if (!full_name || !email) return res.status(400).json({ error: "full_name and email are required" });
+      const row = await sbInsert("registration_requests", { full_name, email, phone: phone || null, pharmacy_name: pharmacy_name || null, role_requested: role_requested || "pharmacy_staff", message: message || null });
+      return res.json(row);
+    } catch (e: any) { return res.status(500).json({ error: e.message }); }
+  });
+
+  app.get("/api/register-requests", async (req, res) => {
+    try {
+      const data = await sbGet("registration_requests", "select=*&order=created_at.desc");
+      return res.json(data);
+    } catch (e: any) { return res.status(500).json({ error: e.message }); }
+  });
+
+  app.patch("/api/register-requests/:id", async (req, res) => {
+    try {
+      const { status, reviewed_by } = req.body;
+      const row = await sbPatch("registration_requests", `id=eq.${req.params.id}`, { status, reviewed_by, reviewed_at: new Date().toISOString() });
+      return res.json(row);
+    } catch (e: any) { return res.status(500).json({ error: e.message }); }
+  });
+
+
   return httpServer;
 }
