@@ -7,6 +7,7 @@ import { queryClient } from "./lib/queryClient";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
 import Pin from "@/pages/pin";
+import RegisterRequest from "@/pages/register-request";
 import Dashboard from "./pages/dashboard";
 import DailyFigures from "./pages/daily-figures";
 import CashingUp from "./pages/cashing-up";
@@ -48,6 +49,7 @@ function Router() {
     <Switch>
       <Route path="/login" component={Login} />
       <Route path="/pin" component={Pin} />
+      <Route path="/register-request" component={RegisterRequest} />
 
       <GuardedRoute path="/" component={Dashboard} />
       <GuardedRoute path="/control-centre" component={ControlCentre} />
