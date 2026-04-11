@@ -122,7 +122,32 @@ export function AppShell({ children }: PropsWithChildren) {
         icon: Settings,
         testId: "link-nav-admin",
         requiresRole: (r) => r === "Head Office Admin" || r === "Super Admin",
-      }, {} as Record<string, NavItem[]>);
+      },
+    ],
+    [session, modules]
+  );
+  const sectionMap: Record<string, string> = {
+    "/control-centre": "Head Office",
+    "/": "Operations",
+    "/daily-figures": "Operations",
+    "/cashing-up": "Banking",
+    "/bookkeeping": "Banking",
+    "/incidents": "Compliance",
+    "/exceptions": "Compliance",
+    "/compliance": "Compliance",
+    "/private-clinic": "Operations",
+    "/monthly-close": "Banking",
+    "/reports": "Reports",
+    "/bonus-performance": "Bonus",
+    "/access-overview": "Settings",
+    "/admin": "Settings",
+  };
+  const groupedNav = navItems.reduce((acc: Record<string, NavItem[]>, item) => {
+    const section = item.section || sectionMap[item.href] || "Other";
+    if (!acc[section]) acc[section] = [];
+    acc[section].push(item);
+    return acc;
+  }, {} as Record<string, NavItem[]>);
 
     const sectionOrder = ["Head Office", "Operations", "Banking", "Bonus", "Compliance", "Reports", "Documents", "Settings", "Other"];
 
