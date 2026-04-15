@@ -33,6 +33,7 @@ import logo from "@/assets/at-health-logo.png";
 type NavItem = {
   href: string;
   label: string;
+  roles?: string[];
   icon: React.ComponentType<{ className?: string }>;
   testId: string;
   requiresRole?: (role: string | undefined) => boolean;
@@ -45,6 +46,9 @@ export function AppShell({ children }: PropsWithChildren) {
   const { session, signOut, selectStaff } = useAuth();
   const { settings, modules } = useOrg();
   const [open, setOpen] = useState(false);
+  const isHO = session.scope?.type === "headoffice";
+  const isManager = session.staff?.role === "Pharmacy Manager";
+  const isManagerOrHO = isHO || isManager;
 
   const navItems: NavItem[] = useMemo(
     () => [
@@ -62,7 +66,8 @@ export function AppShell({ children }: PropsWithChildren) {
          href: "/bookkeeping", 
          label: "Bookkeeping", 
          icon: BookOpen, 
-         testId: "link-nav-bookkeeping" 
+         testId: "link-nav-bookkeeping",
+         roles: ["manager", "headoffice"],
       },
       {
          href: "/incidents",
@@ -88,6 +93,7 @@ export function AppShell({ children }: PropsWithChildren) {
         label: "Private Clinic",
         icon: HeartPulse,
         testId: "link-nav-private-clinic",
+        roles: ["manager", "headoffice"],
       },
       {
         href: "/monthly-close",
@@ -100,6 +106,7 @@ export function AppShell({ children }: PropsWithChildren) {
         label: "Reports",
         icon: BarChart3,
         testId: "link-nav-reports",
+        roles: ["headoffice"],
         requiresRole: (r) => r === "Finance" || r === "Head Office Admin" || r === "Super Admin",
       },
       {
@@ -114,6 +121,7 @@ export function AppShell({ children }: PropsWithChildren) {
         label: "Access Overview",
         icon: Shield,
         testId: "link-nav-access",
+        roles: ["headoffice"],
         requiresRole: (r) => r === "Head Office Admin" || r === "Super Admin",
       },
       {
@@ -121,6 +129,7 @@ export function AppShell({ children }: PropsWithChildren) {
         label: "Platform Settings",
         icon: Settings,
         testId: "link-nav-admin",
+        roles: ["headoffice"],
         requiresRole: (r) => r === "Head Office Admin" || r === "Super Admin",
       },
     ],
@@ -148,6 +157,18 @@ export function AppShell({ children }: PropsWithChildren) {
     acc[section].push(item);
     return acc;
   }, {} as Record<string, NavItem[]>);
+  // Filter nav items by role
+  const filteredGroupedNav = Object.fromEntries(
+    Object.entries(filteredGroupedNav)
+      .map(([section, items]) => [
+        section,
+        items.filter(item => !item.roles ||
+          (isHO && item.roles.includes("headoffice")) ||
+          (isManagerOrHO && item.roles.includes("manager"))
+        ),
+      ])
+      .filter(([_, items]) => (items as NavItem[]).length > 0)
+  ) as Record<string, NavItem[]>;
 
 
   function NavLinks({ compact = false }: { compact?: boolean }) {
@@ -156,7 +177,7 @@ export function AppShell({ children }: PropsWithChildren) {
     return (
       <div className={cn("flex flex-col gap-4", compact ? "" : "mt-2")}> 
         {sectionOrder.map(section => {
-           if (!groupedNav[section] || groupedNav[section].length === 0) return null;
+           if (!filteredGroupedNav[section] || filteredGroupedNav[section].length === 0) return null;
            
            return (
               <div key={section} className="space-y-1">
@@ -166,7 +187,7 @@ export function AppShell({ children }: PropsWithChildren) {
                     </div>
                  )}
                  <nav className="grid gap-0.5">
-                    {groupedNav[section].map((item) => {
+                    {filteredGroupedNav[section].map((item) => {
                       const active = location === item.href;
                       const Icon = item.icon;
                       return (
