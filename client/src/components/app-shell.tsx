@@ -46,8 +46,8 @@ export function AppShell({ children }: PropsWithChildren) {
   const { session, signOut, selectStaff } = useAuth();
   const { settings, modules } = useOrg();
   const [open, setOpen] = useState(false);
-  const isHO = session.scope?.type === "headoffice";
-  const isManager = session.staff?.role === "Pharmacy Manager";
+  const isHO = session?.scope?.type === "headoffice";
+  const isManager = session?.staff?.role === "Pharmacy Manager";
   const isManagerOrHO = isHO || isManager;
 
   const navItems: NavItem[] = useMemo(
@@ -167,7 +167,7 @@ export function AppShell({ children }: PropsWithChildren) {
           (isManagerOrHO && item.roles.includes("manager"))
         ),
       ])
-      .filter(([_, items]) => (items as NavItem[]).length > 0)
+      .filter(([_, items]) => (items as unknown as NavItem[]).length > 0)
   ) as Record<string, NavItem[]>;
 
 
