@@ -194,6 +194,12 @@ export function AppShell({ children }: PropsWithChildren) {
     );
   }
 
+  const header = (
+    <div className="flex items-center gap-3 px-2 py-1">
+      <img src={logo} alt="AT Health" className="h-8 w-auto" />
+    </div>
+  );
+
   return (
     <div className="min-h-dvh app-bg relative">
       <div className="noise-overlay" />
